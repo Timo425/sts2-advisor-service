@@ -17,6 +17,32 @@ Entry format:
 
 ---
 
+## 2026-05-09 — STS2MCP GET re-opens shop / treasure UI as a side effect
+
+**Symptom:** while leaving a shop, the inventory view kept popping back up. User had to close it and exit fast or it would reopen — hard to escape.
+
+**Cause:** STS2MCP's docs state explicitly that querying `/api/v1/singleplayer` while in `shop` state auto-opens the shop inventory; same applies to `treasure` (chest auto-opens on first query). Our watcher was polling at 1.5s, so as soon as the user dismissed the inventory, the next tick re-fired the auto-open.
+
+**Mitigation:** raised default poll interval from 1500ms to 3000ms. Gives the user a full multi-second window to exit before the next state query. Configurable via `POLL_MS` env var.
+
+**Better fix (not done):** detect transition-out states (proceed clicked) and pause polling for a few seconds, or stop polling once state has been stable for N consecutive ticks. The current 3s default is a blunt fix.
+
+**Status:** mitigated 2026-05-09.
+
+---
+
+## 2026-05-09 — Local annotation overrides didn't reach Shunrai's logic.js (fixed)
+
+**Symptom:** after adding `localRelicAnnotations.ANCHOR` to override Shunrai's bogus +5 scoreEffects, restarting the watcher *still* showed `+5.0 Anchor boosts strength cards` on every offering. Same pattern for local card overrides (Not Yet, Break, etc. would still hit "Unknown card" if the user hadn't seen them annotate yet).
+
+**Why:** the `localAnnotations` overrides were applied at the `canonicalLoader` level — that affects "is this card annotated?" reporting (e.g. `npm run coverage`) but not the inner Shunrai DB inside the vm context. `logic.js`'s `scoreCard` and `scoreRelic` both read directly from that inner DB, so they were still seeing the unpatched Shunrai entries.
+
+**Fix:** at adapter init, after loading db.js + logic.js into the vm context, walk localCardAnnotations and localRelicAnnotations and inject each entry directly into the in-vm DB (cards into the right per-character bucket, relics flat). Then re-run ensureDbNames(). Now scoreCard / scoreRelic / scoreEffects-loop all see the overrides.
+
+**Status:** patched 2026-05-09.
+
+---
+
 ## 2026-05-09 — Anchor's scoreEffects pushed every offering to S 6.00
 
 **Symptom:** at a shop on floor 25, every offered card got `+5.0 ◈ Anchor boosts strength cards` (or `block`), pushing Thunderclap, Primal Force, True Grit, Juggling, Prolong all to S 6.00 — saturated ceiling regardless of fit.

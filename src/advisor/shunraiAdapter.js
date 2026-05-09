@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { buildCanonicalCatalog } from '../data/canonicalLoader.js';
+import { localCardAnnotations, localRelicAnnotations } from '../data/localAnnotations.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(here, '..', 'vendor', 'db.js');
@@ -13,6 +14,25 @@ let catalog = null;
 let cardById = null;
 let relicById = null;
 
+function applyLocalOverridesToContext(_ctx, _catalog) {
+  const DB = _ctx.DB;
+  if (!DB || typeof DB !== 'object') return;
+  // Card overrides — keyed by canonical ID; we need codex.color to know the bucket.
+  for (const e of _catalog.cards) {
+    const ann = localCardAnnotations[e.codex.id];
+    if (!ann) continue;
+    const color = e.codex.color;
+    if (!DB.cards[color]) DB.cards[color] = {};
+    DB.cards[color][e.codex.id] = ann;
+  }
+  // Relic overrides — db.relics is flat by ID.
+  for (const [id, ann] of Object.entries(localRelicAnnotations)) {
+    DB.relics[id] = ann;
+  }
+  // Rebuild DB.names so any newly-added entries are picked up by name searches.
+  if (typeof _ctx.ensureDbNames === 'function') _ctx.ensureDbNames();
+}
+
 function init() {
   if (ctx) return;
   const dbSrc = readFileSync(dbPath, 'utf8');
@@ -21,6 +41,9 @@ function init() {
   vm.runInContext(dbSrc + '\n' + logicSrc, ctx);
 
   catalog = buildCanonicalCatalog();
+  // Patch the in-vm DB so logic.js's scoring sees our local overrides
+  // (otherwise overrides only affect canonicalLoader's "annotated?" view).
+  applyLocalOverridesToContext(ctx, catalog);
   cardById = new Map(catalog.cards.map(e => [e.codex.id, e]));
   relicById = new Map(catalog.relics.map(e => [e.codex.id, e]));
 }

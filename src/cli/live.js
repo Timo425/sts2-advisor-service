@@ -55,7 +55,11 @@ function fmtScoreCell(val) {
 }
 
 const STS2MCP_URL = process.env.STS2MCP_URL ?? 'http://localhost:15526/api/v1/singleplayer';
-const POLL_MS = Number(process.env.POLL_MS ?? 1500);
+// Default 3s — STS2MCP's GET /singleplayer auto-opens shop inventory and treasure
+// chests as a side effect of querying state, which can re-trigger the in-game UI
+// after the user dismisses it. 3s gives the user enough time to leave a screen
+// before our next poll re-fires the auto-open.
+const POLL_MS = Number(process.env.POLL_MS ?? 3000);
 
 let lastStateType = null;
 let lastFloor = null;
