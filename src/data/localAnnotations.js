@@ -102,6 +102,40 @@ export const localRelicAnnotations = {
     // No scoreEffects: the 14 block is fixed and doesn't scale any card class.
   },
 
+  // Override: Shunrai's Archaic Tooth is tier B, but the effect — transform a
+  // starter card into an "ancient" version — is essentially a free S-tier card
+  // swap. Bash → Break (1-cost 20 dmg + 5 Vulnerable, vs Bash's 2-cost 8 dmg + 2
+  // Vulnerable) is a colossal upgrade, and the Strike/Defend ancient versions
+  // are similarly outsized. Should rate alongside Whetstone (tier A) at minimum,
+  // but the magnitude is more S than A.
+  ARCHAIC_TOOTH: {
+    id: 'Archaic Tooth',
+    tier: 'S',
+    char: 'any',
+    rarity: 'ancient',
+    syn: [],
+    builds: ['any'],
+    notes: 'Transform a starter card into an ancient version (e.g. Bash → Break). Effectively a free S-tier card swap; one of the strongest one-time-pickup effects.',
+    // No scoreEffects: one-time effect.
+  },
+
+  // Override: Shunrai's Precarious Shears is tier B with builds locked to
+  // ['sly','claw']. Card removal is one of STS's highest-value resources
+  // regardless of build — two removals for 13 HP is comparable to ~150g of
+  // shop services plus a meaningful deck-shape improvement. Should rate A,
+  // and the build restriction is wrong (removal helps almost any deck;
+  // arguably conflicts with Sly/Discard which wants card volume).
+  PRECARIOUS_SHEARS: {
+    id: 'Precarious Shears',
+    tier: 'A',
+    char: 'any',
+    rarity: 'ancient',
+    syn: [],
+    builds: ['any'],
+    notes: 'Remove 2 cards from deck for 13 HP. Card removal is among the highest-value resources in STS; two-for-13-HP is an excellent rate, especially in Act 1 with starter basics to cut.',
+    // No scoreEffects: one-time effect.
+  },
+
   // Override: Shunrai's Captain's Wheel has scoreEffects {tags:['block'], bonus:0.4}.
   // Same fixed-defensive-resource pattern — gives 18 block on turn 3, doesn't scale
   // block cards in your deck. The "more block helps you survive to turn 3" connection

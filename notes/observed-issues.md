@@ -43,6 +43,24 @@ Entry format:
 
 ---
 
+## 2026-05-09 — Tier disparity between equivalent one-time-pickup relics
+
+**Symptom:** Three relics with one-time-on-pickup effects scored very differently:
+
+- Whetstone (A → score 5.90): upgrade 2 random Attacks
+- Archaic Tooth (B → score 3.00): transform a starter card into an ancient version (e.g. Bash → Break, an outsized upgrade)
+- Precarious Shears (B → score 3.00): remove 2 cards for 13 HP
+
+The tiers don't reflect actual in-game value. Archaic Tooth's effect (free S-tier card swap) is materially stronger than Whetstone's, not weaker. Precarious Shears at 2-removals-for-13-HP is comparable to Whetstone or better.
+
+**Bumped via local override:**
+- Archaic Tooth: B → S
+- Precarious Shears: B → A (also dropped the `builds: ['sly', 'claw']` restriction; removal helps almost any build)
+
+**Status:** patched 2026-05-09. Tiers are inherently judgment calls — these are starting points; revise if play experience disagrees.
+
+---
+
 ## 2026-05-09 — One-time-effect and fixed-effect relics over-boost cards via scoreEffects
 
 **Pattern:** Shunrai's `db.relics` annotates several relics with `scoreEffects` that boost cards persistently, but the relic's actual game effect is either (a) one-time-on-pickup or (b) fixed/independent of card composition. The boost ends up applied forever to anything matching the tag.
