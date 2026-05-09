@@ -73,6 +73,35 @@ export const localRelicAnnotations = {
     // No scoreEffects: the 10 block is fixed and doesn't scale any card class.
   },
 
+  // Override: Shunrai's Whetstone has scoreEffects {tags:['damage'], bonus:0.2}
+  // that persistently boosts attack cards — but the upgrade-2-attacks effect is
+  // one-time-on-pickup and after that the relic does nothing. The bonus is small
+  // but incorrect (visible on every attack offering even floors after pickup).
+  WHETSTONE: {
+    id: 'Whetstone',
+    tier: 'A',
+    char: 'any',
+    rarity: 'common',
+    syn: ['upgrade'],
+    builds: ['any'],
+    notes: 'Upgrade 2 random Attacks on pickup. One-time effect — zero ongoing combat impact.',
+    // No scoreEffects: post-pickup the relic does nothing.
+  },
+
+  // Override: Shunrai's Horn Cleat has scoreEffects {tags:['block','strength'], bonus:5}
+  // — same pattern as the Anchor bug. The relic gives a flat 14 block on turn 2;
+  // doesn't scale block or strength cards at all.
+  HORN_CLEAT: {
+    id: 'Horn Cleat',
+    tier: 'B',
+    char: 'any',
+    rarity: 'common',
+    syn: ['block'],
+    builds: ['any'],
+    notes: 'Gain 14 Block at start of Turn 2. Free defensive value, fixed amount.',
+    // No scoreEffects: the 14 block is fixed and doesn't scale any card class.
+  },
+
   // Add ancient relics from v0.103+ as they show up in real runs:
   //   FISHING_ROD, HEFTY_TABLET, KALEIDOSCOPE, NEOWS_BONES, NEOWS_TALISMAN,
   //   PHIAL_HOLSTER, SILKEN_TRESS, WINGED_BOOTS

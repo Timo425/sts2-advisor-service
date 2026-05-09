@@ -43,6 +43,26 @@ Entry format:
 
 ---
 
+## 2026-05-09 — One-time-effect and fixed-effect relics over-boost cards via scoreEffects
+
+**Pattern:** Shunrai's `db.relics` annotates several relics with `scoreEffects` that boost cards persistently, but the relic's actual game effect is either (a) one-time-on-pickup or (b) fixed/independent of card composition. The boost ends up applied forever to anything matching the tag.
+
+**Confirmed instances (overridden in `localRelicAnnotations`):**
+
+- **Anchor** (+5 on block/strength) — fixed 10 block at combat start. Doesn't scale any card class.
+- **Whetstone** (+0.2 on damage) — one-time upgrade of 2 random Attacks on pickup. Post-pickup: zero ongoing impact. Small bonus, still incorrect.
+- **Horn Cleat** (+5 on block/strength) — fixed 14 block on turn 2. Same Anchor-style bug.
+
+**Audit candidate — not yet decided:**
+
+- **Permafrost** (+5 on power tag) — "First Power played per combat: gain 6 Block." This is per-combat, not one-time, so a Power-tag bonus is plausible. But +5 may still be too high; +1–2 might be more proportional to the 6 block reward.
+
+**Fix mechanism:** add an entry to `localRelicAnnotations` with the same fields minus the `scoreEffects` array. The local-overrides layer wins over Shunrai's vendored entry inside the in-vm DB.
+
+**Status:** patched for Anchor, Whetstone, Horn Cleat; Permafrost open. Would benefit from a broader audit at some point — enumerate all relics with `scoreEffects.bonus >= 3` (or even `>= 1`) and sanity-check each.
+
+---
+
 ## 2026-05-09 — Anchor's scoreEffects pushed every offering to S 6.00
 
 **Symptom:** at a shop on floor 25, every offered card got `+5.0 ◈ Anchor boosts strength cards` (or `block`), pushing Thunderclap, Primal Force, True Grit, Juggling, Prolong all to S 6.00 — saturated ceiling regardless of fit.
