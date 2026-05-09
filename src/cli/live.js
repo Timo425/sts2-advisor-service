@@ -398,19 +398,33 @@ async function tick() {
   const floor = state?.run?.floor ?? null;
 
   // Relic tracking — first poll establishes baseline, subsequent polls announce additions.
+  // Tier shown for context; absence of the ▶ marker means it's informational, not advice.
   const relicList = state?.player?.relics ?? [];
   const currentRelicIds = new Set(relicList.map(r => r.id).filter(Boolean));
+  const character = mapCharacter(state?.player?.character);
+  const cache = getSnapshot();
+  const deck = cache?.deckCards ?? [];
+
   if (firstRelicCheck) {
     firstRelicCheck = false;
-    if (relicList.length) {
-      const names = relicList.map(r => r.name).join(', ');
-      console.log(`[${stamp()}] relics in play: ${names}`);
+    if (relicList.length && character) {
+      console.log(`[${stamp()}] ${dim(`relics in play (${relicList.length}):`)}`);
+      const offered = relicList.map(r => ({ id: r.id, name: r.name }));
+      const { grades } = gradeRelicOfferings({ character, deck, offered });
+      // Sort highest-tier first for at-a-glance scanning.
+      const sorted = [...grades].sort((a, b) => (b.result?.finalScore ?? 0) - (a.result?.finalScore ?? 0));
+      for (const g of sorted) {
+        console.log(fmtRelic(g));
+      }
     }
-  } else {
+  } else if (character) {
     for (const id of currentRelicIds) {
       if (!lastRelicIds.has(id)) {
         const r = relicList.find(rr => rr.id === id);
-        console.log(`[${stamp()}] new relic: ${r?.name ?? id}`);
+        const offered = [{ id: r.id, name: r.name }];
+        const { grades } = gradeRelicOfferings({ character, deck, offered });
+        console.log(`[${stamp()}] ${dim('new relic:')}`);
+        console.log(fmtRelic(grades[0]));
       }
     }
   }
