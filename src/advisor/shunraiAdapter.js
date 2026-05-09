@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { buildCanonicalCatalog } from '../data/canonicalLoader.js';
+import { loadCodexBetaLatest } from '../data/codexLoader.js';
 import { localCardAnnotations, localRelicAnnotations } from '../data/localAnnotations.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -13,6 +14,10 @@ let ctx = null;
 let catalog = null;
 let cardById = null;
 let relicById = null;
+// Full name index across ALL spire-codex card colors (incl. event/curse/token/status),
+// used by findCardsInText so event-flavour-text can be scanned for cards that aren't
+// in our pickable-only canonical catalog (e.g. Exterminate, Squash — color: 'event').
+let allCardNames = null;
 
 function applyLocalOverridesToContext(_ctx, _catalog) {
   // db.js declares `const DB = {...}` at script top level — that's a script-scope
@@ -57,6 +62,11 @@ function init() {
   applyLocalOverridesToContext(ctx, catalog);
   cardById = new Map(catalog.cards.map(e => [e.codex.id, e]));
   relicById = new Map(catalog.relics.map(e => [e.codex.id, e]));
+  // Load full codex card list (all colors) for text-matching purposes.
+  const fullCodex = loadCodexBetaLatest();
+  allCardNames = fullCodex.cards
+    .filter(c => c.name && c.id)
+    .map(c => ({ name: c.name, id: c.id }));
 }
 
 function cardFriendlyName(codexId) {
@@ -209,19 +219,20 @@ export function gradeRemovalForDeck({
 // option description like "Add Exterminate to your Deck"). Used to grade card-
 // pickup events that aren't structured as card_select state. Word-boundary
 // case-sensitive match — STS card names are always capitalized in-game.
+// Scans ALL codex card colors (event/curse/token/status included), since event
+// rewards routinely add cards from those pools to the deck.
 export function findCardsInText(text) {
   init();
-  if (!text) return [];
+  if (!text || !allCardNames) return [];
   const out = [];
   const seen = new Set();
-  for (const e of catalog.cards) {
-    const name = e.codex.name;
-    if (!name || seen.has(name)) continue;
+  for (const { name, id } of allCardNames) {
+    if (seen.has(name)) continue;
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`\\b${escaped}\\b`);
     if (pattern.test(text)) {
       seen.add(name);
-      out.push({ name, codexId: e.codex.id });
+      out.push({ name, codexId: id });
     }
   }
   return out;

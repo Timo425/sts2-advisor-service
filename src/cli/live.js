@@ -191,13 +191,16 @@ function fmtDeckLine(cache, deckAnalysis, composition) {
   lines.push(`   ${dim(parts.join('   '))}`);
 
   if (composition) {
+    // Fixed-width track: filled blocks show actual count, dim track shows "headroom"
+    // up to the soft cap. Anything beyond fills the bar entirely (saturated).
     const BLOCKS_PER_CARD = 2;
-    const MAX_BAR = 36;
+    const TRACK_BLOCKS = 24;  // = 12 cards' worth — comfortably above typical role counts
     lines.push(`   ${dim('roles:')}`);
     for (const r of ROLE_BARS) {
       const count = composition[r.key] ?? 0;
-      const width = Math.min(count * BLOCKS_PER_CARD, MAX_BAR);
-      const bar = count > 0 ? r.color('█'.repeat(width)) : dim('·');
+      const filled = Math.min(count * BLOCKS_PER_CARD, TRACK_BLOCKS);
+      const empty = TRACK_BLOCKS - filled;
+      const bar = r.color('█'.repeat(filled)) + dim('░'.repeat(empty));
       lines.push(`     ${dim(r.label)} ${String(count).padStart(2)}  ${bar}`);
     }
     const extras = [];
