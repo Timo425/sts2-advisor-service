@@ -190,6 +190,7 @@ function reportCardReward(state) {
 
   const rec = pickBest(grades, g => g.finalScore, { canSkip });
   const bestSet = new Set(rec.picks);
+  const sorted = [...grades].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
 
   console.log(fmtHeader(`CARD REWARD (${offered.length} offered)`, state));
   console.log(fmtDeckLine(cache, deckAnalysis));
@@ -200,7 +201,7 @@ function reportCardReward(state) {
     if (line) console.log(line);
   }
   console.log();
-  for (const g of grades) {
+  for (const g of sorted) {
     console.log(fmtCard(g, { isBest: bestSet.has(g) }));
   }
 }
@@ -221,7 +222,8 @@ function reportShop(state) {
   if (offered.length) {
     console.log(`\n  ${bold('CARDS')}`);
     const { grades } = gradeCardOfferings({ character, deck, offered, floor, equippedRelics });
-    for (const g of grades) {
+    const sorted = [...grades].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+    for (const g of sorted) {
       const offer = offered.find(o => o.id === g.codexId);
       console.log(fmtCard(g, { price: offer?.price, canAfford: offer?.can_afford }));
     }
@@ -229,7 +231,8 @@ function reportShop(state) {
   if (offeredRelics.length) {
     console.log(`\n  ${bold('RELICS')}`);
     const { grades } = gradeRelicOfferings({ character, deck, offered: offeredRelics });
-    for (const g of grades) {
+    const sorted = [...grades].sort((a, b) => (b.result?.finalScore ?? 0) - (a.result?.finalScore ?? 0));
+    for (const g of sorted) {
       const offer = offeredRelics.find(o => o.id === g.codexId);
       console.log(fmtRelic(g, { price: offer?.price, canAfford: offer?.can_afford }));
     }
@@ -303,11 +306,12 @@ function reportCardSelect(state) {
     // can_skip isn't reliably surfaced for card_select offerings — be conservative and don't recommend skip.
     const rec = pickBest(grades, g => g.finalScore, { canSkip: false });
     const bestSet = new Set(rec.picks);
+    const sorted = [...grades].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
     console.log(fmtDeckLine(cache, deckAnalysis));
     const line = fmtPickLine('Pick', rec.picks, g => g.name, g => ({ grade: g.finalGrade ?? '?', score: g.finalScore ?? 0 }));
     if (line) console.log(line);
     console.log();
-    for (const g of grades) {
+    for (const g of sorted) {
       console.log(fmtCard(g, { isBest: bestSet.has(g) }));
     }
   } else if (screenType === 'select' || screenType === 'simple_select') {
@@ -346,6 +350,7 @@ function reportRelicChoice(state) {
   const { grades } = gradeRelicOfferings({ character, deck, offered: offeredRelics });
   const rec = pickBest(grades, g => g.result?.finalScore, { canSkip });
   const bestSet = new Set(rec.picks);
+  const sorted = [...grades].sort((a, b) => (b.result?.finalScore ?? 0) - (a.result?.finalScore ?? 0));
 
   console.log(fmtHeader(`${state.state_type.toUpperCase()} (${offeredRelics.length} relics)`, state));
   console.log(fmtDeckLine(cache, undefined));
@@ -357,7 +362,7 @@ function reportRelicChoice(state) {
     if (line) console.log(line);
   }
   console.log();
-  for (const g of grades) {
+  for (const g of sorted) {
     console.log(fmtRelic(g, { isBest: bestSet.has(g) }));
   }
 }
