@@ -17,6 +17,20 @@ Entry format:
 
 ---
 
+## 2026-05-09 — Strike+ rated identically to Strike for removal
+
+**Symptom:** at a shop's removal screen, both `Strike` and `Strike+` rank S 5.00 as removal targets ("also: S 5.00 Strike+ / S 5.00 Strike"). Strike+ deals 9 damage vs Strike's 6 — meaningfully more useful, should be a lower-priority cut.
+
+**Why it happens:** `scoreRemoval` in `vendor/logic.js` checks `name.includes('strike')` to identify basic Strikes (with an exceptions list like 'pommel', 'perfected', etc.). Upgrade level isn't part of the discriminator, so the upgraded copy gets the same maximum-priority removal treatment as the unupgraded one.
+
+**Same upstream gap probably applies to Defend / Defend+** (and any other "basic" the function flags as universally cuttable).
+
+**Fix sketch:** in `scoreRemoval`, when a card is identified as a basic (Strike, Defend), check `is_upgraded` (or equivalently the `+` suffix on the friendly name) and reduce removal priority by ~1.0–1.5 if upgraded. The basic version stays S 5.00; the upgraded version drops to ~A 3.5–B 3.0 — still removable, but cut the unupgraded one first.
+
+**Status:** open, low risk to implement once we want to tune.
+
+---
+
 ## 2026-05-09 — Combat-only status cards leaked into deck snapshot
 
 **Symptom:** at a shop on floor 25, the removal advisor's top target was `Dazed` at S 5.00 ("Curse/Status — remove immediately"). Dazed is a combat-only status card added by enemy effects; it isn't in the permanent deck and disappears at combat end. Same applies to Wound, Burn, Slimed, Void, Debris.
