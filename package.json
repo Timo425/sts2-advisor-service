@@ -1,0 +1,16 @@
+{
+  "name": "sts2-advisor-service",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Out-of-process STS2 deck advisor: spire-codex canonical, Shunrai annotations overlay.",
+  "scripts": {
+    "coverage": "node src/cli/coverage.js",
+    "grade": "node src/cli/grade.js",
+    "probe": "node src/cli/probe.js",
+    "live": "node src/cli/live.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
