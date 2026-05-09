@@ -191,10 +191,13 @@ function fmtDeckLine(cache, deckAnalysis, composition) {
   lines.push(`   ${dim(parts.join('   '))}`);
 
   if (composition) {
+    const BLOCKS_PER_CARD = 2;
+    const MAX_BAR = 36;
     lines.push(`   ${dim('roles:')}`);
     for (const r of ROLE_BARS) {
       const count = composition[r.key] ?? 0;
-      const bar = count > 0 ? r.color('█'.repeat(Math.min(count, 18))) : dim('·');
+      const width = Math.min(count * BLOCKS_PER_CARD, MAX_BAR);
+      const bar = count > 0 ? r.color('█'.repeat(width)) : dim('·');
       lines.push(`     ${dim(r.label)} ${String(count).padStart(2)}  ${bar}`);
     }
     const extras = [];
