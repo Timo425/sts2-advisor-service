@@ -12,7 +12,7 @@ import {
   extractRemovalService,
 } from '../lib/stsmcpAdapter.js';
 import { updateFromCombat, getSnapshot } from '../lib/deckCache.js';
-import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck } from '../advisor/shunraiAdapter.js';
+import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition } from '../advisor/shunraiAdapter.js';
 
 // Match Shunrai-style canonical ID format (uppercase, _-separated, no punctuation).
 const nameKey = (s) => (s ?? '').toString().toUpperCase().replace(/\+$/, '').replace(/[\s\-]/g, '_').replace(/[^A-Z0-9_]/g, '');
@@ -168,7 +168,8 @@ function fmtHeader(label, state) {
   return `\n${dim('───')} ${cyan(stamp())} ${bold(label)} ${dim('· floor ' + floor + ' · ' + character)}`;
 }
 
-function fmtDeckLine(cache, deckAnalysis) {
+function fmtDeckLine(cache, deckAnalysis, composition) {
+  const lines = [];
   const parts = [];
   if (cache) parts.push(`deck ${cache.deckCards.length} (cached @ floor ${cache.floor})`);
   else parts.push(red('no deck snapshot yet'));
@@ -176,7 +177,20 @@ function fmtDeckLine(cache, deckAnalysis) {
     const arches = deckAnalysis.detected.map(d => `${d.arch.name ?? d.arch.id}(${d.strength.toFixed(2)})`).join(' · ');
     parts.push(`archetypes: ${arches}`);
   }
-  return `   ${dim(parts.join('   '))}`;
+  lines.push(`   ${dim(parts.join('   '))}`);
+  if (composition) {
+    const r = composition;
+    const roleParts = [
+      `${r.engine ?? 0} engine`,
+      `${r.generator ?? 0} gen`,
+      `${r.payoff ?? 0} payoff`,
+      `${r.defense ?? 0} def`,
+    ];
+    if ((r.setup ?? 0) > 0) roleParts.push(`${r.setup} setup`);
+    if ((r.utility ?? 0) > 0) roleParts.push(`${r.utility} util`);
+    lines.push(`   ${dim('roles: ' + roleParts.join(' · '))}`);
+  }
+  return lines.join('\n');
 }
 
 function reportCardReward(state) {
@@ -195,9 +209,10 @@ function reportCardReward(state) {
   const rec = pickBest(grades, g => g.finalScore, { canSkip });
   const bestSet = new Set(rec.picks);
   const sorted = [...grades].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+  const composition = (cache && character) ? analyzeDeckComposition(character, deck) : null;
 
   console.log(fmtHeader(`CARD REWARD (${offered.length} offered)`, state));
-  console.log(fmtDeckLine(cache, deckAnalysis));
+  console.log(fmtDeckLine(cache, deckAnalysis, composition));
   if (rec.skip) {
     console.log(fmtSkipLine(`best offered is only ${rec.all[0].finalGrade} ${(rec.all[0].finalScore ?? 0).toFixed(2)} — keep deck lean.`));
   } else {
@@ -220,8 +235,9 @@ function reportShop(state) {
   const cache = getSnapshot();
   const deck = cache?.deckCards ?? [];
 
+  const composition = (cache && character) ? analyzeDeckComposition(character, deck) : null;
   console.log(fmtHeader('SHOP', state));
-  console.log(fmtDeckLine(cache, undefined));
+  console.log(fmtDeckLine(cache, undefined, composition));
 
   if (offered.length) {
     console.log(`\n  ${bold('CARDS')}`);
@@ -311,7 +327,8 @@ function reportCardSelect(state) {
     const rec = pickBest(grades, g => g.finalScore, { canSkip: false });
     const bestSet = new Set(rec.picks);
     const sorted = [...grades].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
-    console.log(fmtDeckLine(cache, deckAnalysis));
+    const composition = (cache && character) ? analyzeDeckComposition(character, deck) : null;
+    console.log(fmtDeckLine(cache, deckAnalysis, composition));
     const line = fmtPickLine('Pick', rec.picks, g => g.name, g => ({ grade: g.finalGrade ?? '?', score: g.finalScore ?? 0 }));
     if (line) console.log(line);
     console.log();
@@ -356,8 +373,9 @@ function reportRelicChoice(state) {
   const bestSet = new Set(rec.picks);
   const sorted = [...grades].sort((a, b) => (b.result?.finalScore ?? 0) - (a.result?.finalScore ?? 0));
 
+  const composition = (cache && character) ? analyzeDeckComposition(character, deck) : null;
   console.log(fmtHeader(`${state.state_type.toUpperCase()} (${offeredRelics.length} relics)`, state));
-  console.log(fmtDeckLine(cache, undefined));
+  console.log(fmtDeckLine(cache, undefined, composition));
   if (rec.skip) {
     const top = rec.all[0]?.result;
     console.log(fmtSkipLine(`best offered is only ${top?.finalGrade ?? '?'} ${(top?.finalScore ?? 0).toFixed(2)}.`));

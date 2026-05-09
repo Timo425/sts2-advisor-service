@@ -205,6 +205,21 @@ export function gradeRemovalForDeck({
   };
 }
 
+// Count cards in the deck by their functional role. Mirrors how scoreCard
+// counts engines / generators / payoffs internally for role-balance reasoning.
+export function analyzeDeckComposition(character, deck) {
+  init();
+  const deckCards = normalizeDeck(deck);
+  const counts = { engine: 0, generator: 0, payoff: 0, defense: 0, setup: 0, utility: 0, unknown: 0 };
+  for (const c of deckCards) {
+    const d = ctx.getCard(character, c.name);
+    if (!d) { counts.unknown++; continue; }
+    const role = d.role ?? ctx.getFunctionalRole(d) ?? 'utility';
+    counts[role] = (counts[role] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export function gradeRelicOfferings({
   character,
   deck = [],
