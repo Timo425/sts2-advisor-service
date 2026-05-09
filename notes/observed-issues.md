@@ -17,6 +17,24 @@ Entry format:
 
 ---
 
+## 2026-05-09 — Anchor's scoreEffects pushed every offering to S 6.00
+
+**Symptom:** at a shop on floor 25, every offered card got `+5.0 ◈ Anchor boosts strength cards` (or `block`), pushing Thunderclap, Primal Force, True Grit, Juggling, Prolong all to S 6.00 — saturated ceiling regardless of fit.
+
+**Why it happened:** Shunrai's `db.relics.ANCHOR` entry includes:
+
+```json
+"scoreEffects": [{ "tags": ["block", "strength"], "bonus": 5 }]
+```
+
+`logic.js`'s scoreEffects loop adds `+5 × min(matchingTags, 1.5)` for any card whose `syn`/`mech`/`builds` overlap. That's a massive bonus — the relic Anchor only grants a flat 10 block at combat start, it doesn't actually scale any card class.
+
+**Fix applied:** added `ANCHOR` override to `localRelicAnnotations` with no scoreEffects, and changed `canonicalLoader` so local entries override Shunrai (previously they were fallback-only). Local annotations file now functions as both supplement (post-snapshot cards) and patch (for upstream errors like this one).
+
+**Status:** patched 2026-05-09. Likely a broader pattern — other relic scoreEffects in db.js may also be over-tuned or mis-tagged. Worth a quick audit pass at some point: enumerate all relics with `scoreEffects.bonus >= 3` and sanity-check whether the boost is genuinely warranted or a Shunrai-snapshot-era mistake.
+
+---
+
 ## 2026-05-09 — Strike+ rated identically to Strike for removal
 
 **Symptom:** at a shop's removal screen, both `Strike` and `Strike+` rank S 5.00 as removal targets ("also: S 5.00 Strike+ / S 5.00 Strike"). Strike+ deals 9 damage vs Strike's 6 — meaningfully more useful, should be a lower-priority cut.

@@ -58,18 +58,22 @@ export const localCardAnnotations = {
 };
 
 export const localRelicAnnotations = {
+  // Override: Shunrai's Anchor entry has a +5 scoreEffects bonus on tags
+  // ['block', 'strength'], which (a) is too large — saturates every offering
+  // to S — and (b) wrongly includes 'strength' (Anchor gives a flat 10 block
+  // at combat start; it doesn't scale strength or attacks at all).
+  ANCHOR: {
+    id: 'Anchor',
+    tier: 'S',
+    char: 'any',
+    rarity: 'common',
+    syn: ['block'],
+    builds: ['any'],
+    notes: 'Start each combat with 10 Block. Free Block every fight, regardless of build.',
+    // No scoreEffects: the 10 block is fixed and doesn't scale any card class.
+  },
+
   // Add ancient relics from v0.103+ as they show up in real runs:
   //   FISHING_ROD, HEFTY_TABLET, KALEIDOSCOPE, NEOWS_BONES, NEOWS_TALISMAN,
   //   PHIAL_HOLSTER, SILKEN_TRESS, WINGED_BOOTS
-  //
-  // Schema example:
-  //   FISHING_ROD: {
-  //     id: 'Fishing Rod',
-  //     tier: 'B',
-  //     builds: ['any'],
-  //     syn: [...],
-  //     anti: [],
-  //     notes: '...',
-  //     mech: [...],
-  //   },
 };
