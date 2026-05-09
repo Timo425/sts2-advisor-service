@@ -10,6 +10,13 @@ export function mapCharacter(playerCharacterField) {
   return playerCharacterField.replace(CHARACTER_PREFIX, '').toLowerCase();
 }
 
+// Status cards that enemies add to your piles during combat but disappear at combat end.
+// They're not part of your permanent deck and must be filtered from the snapshot, otherwise
+// they pollute archetype detection and (worst) get rated as S-tier removal targets.
+const COMBAT_ONLY_STATUS_NAMES = new Set([
+  'wound', 'burn', 'dazed', 'slimed', 'void', 'debris',
+]);
+
 export function extractDeckFromCombatState(state) {
   const p = state?.player;
   if (!p) return null;
@@ -21,7 +28,9 @@ export function extractDeckFromCombatState(state) {
     if (!Array.isArray(p[k])) continue;
     for (const c of p[k]) {
       const name = c?.name ?? c?.id;
-      if (name) out.push({ name });
+      if (!name) continue;
+      if (COMBAT_ONLY_STATUS_NAMES.has(String(name).toLowerCase())) continue;
+      out.push({ name });
     }
   }
   return out;

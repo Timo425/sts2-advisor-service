@@ -17,6 +17,20 @@ Entry format:
 
 ---
 
+## 2026-05-09 — Combat-only status cards leaked into deck snapshot
+
+**Symptom:** at a shop on floor 25, the removal advisor's top target was `Dazed` at S 5.00 ("Curse/Status — remove immediately"). Dazed is a combat-only status card added by enemy effects; it isn't in the permanent deck and disappears at combat end. Same applies to Wound, Burn, Slimed, Void, Debris.
+
+**Why it happened:** `extractDeckFromCombatState` concatenates `hand + draw_pile + discard_pile + exhaust_pile`. While in combat, status cards from enemy effects sit in those piles. We snapshotted them as if they were deck members. Then `scoreRemoval` correctly auto-rates them at S because Shunrai's logic.js explicitly treats curse/status names as top removal priority (`CURSE_NAMES = ['wound','burn','dazed','slimed','void','debris']`).
+
+**Fix:** added `COMBAT_ONLY_STATUS_NAMES` filter in `extractDeckFromCombatState` so the six status names are dropped at snapshot time. They'll never appear in archetype detection, removal candidates, or anywhere else.
+
+**Status:** patched 2026-05-09.
+
+**Note for the future:** if STS2 introduces new combat-only-status cards, add them to the same set. Curse cards (Ascender's Bane, Pain, Parasite, Decay, etc.) are permanent additions and *should* still flow through the snapshot — they're real deck members and removal targets.
+
+---
+
 ## 2026-05-09 — Combat-time auto-exhaust relics overrate permanent removal of basics
 
 **Terminology, important:** *exhaust* = card removed from active piles for the rest of *this combat only* (returns next fight). *Removal* = card permanently gone from the deck. The two are distinct game concepts and Shunrai treats them the same (it doesn't).
