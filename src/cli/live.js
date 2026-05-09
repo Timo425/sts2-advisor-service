@@ -168,6 +168,17 @@ function fmtHeader(label, state) {
   return `\n${dim('───')} ${cyan(stamp())} ${bold(label)} ${dim('· floor ' + floor + ' · ' + character)}`;
 }
 
+// Color palette for role bars — chosen to be distinct from the tier colors
+// so the eye doesn't read role bars as grade markers.
+const yellow = (s) => ansi('33', s);
+const blue = (s) => ansi('34', s);
+const ROLE_BARS = [
+  { key: 'engine',    label: 'engine   ', color: cyan },
+  { key: 'generator', label: 'generator', color: green },
+  { key: 'payoff',    label: 'payoff   ', color: yellow },
+  { key: 'defense',   label: 'defense  ', color: blue },
+];
+
 function fmtDeckLine(cache, deckAnalysis, composition) {
   const lines = [];
   const parts = [];
@@ -178,17 +189,19 @@ function fmtDeckLine(cache, deckAnalysis, composition) {
     parts.push(`archetypes: ${arches}`);
   }
   lines.push(`   ${dim(parts.join('   '))}`);
+
   if (composition) {
-    const r = composition;
-    const roleParts = [
-      `${r.engine ?? 0} engine`,
-      `${r.generator ?? 0} gen`,
-      `${r.payoff ?? 0} payoff`,
-      `${r.defense ?? 0} def`,
-    ];
-    if ((r.setup ?? 0) > 0) roleParts.push(`${r.setup} setup`);
-    if ((r.utility ?? 0) > 0) roleParts.push(`${r.utility} util`);
-    lines.push(`   ${dim('roles: ' + roleParts.join(' · '))}`);
+    lines.push(`   ${dim('roles:')}`);
+    for (const r of ROLE_BARS) {
+      const count = composition[r.key] ?? 0;
+      const bar = count > 0 ? r.color('█'.repeat(Math.min(count, 18))) : dim('·');
+      lines.push(`     ${dim(r.label)} ${String(count).padStart(2)}  ${bar}`);
+    }
+    const extras = [];
+    if (composition.setup)  extras.push(`${composition.setup} setup`);
+    if (composition.utility) extras.push(`${composition.utility} util`);
+    if (composition.unknown) extras.push(`${composition.unknown} unknown`);
+    if (extras.length) lines.push(`     ${dim('+ ' + extras.join(' · '))}`);
   }
   return lines.join('\n');
 }
