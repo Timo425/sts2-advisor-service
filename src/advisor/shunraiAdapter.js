@@ -15,22 +15,33 @@ let cardById = null;
 let relicById = null;
 
 function applyLocalOverridesToContext(_ctx, _catalog) {
-  const DB = _ctx.DB;
-  if (!DB || typeof DB !== 'object') return;
-  // Card overrides — keyed by canonical ID; we need codex.color to know the bucket.
+  // db.js declares `const DB = {...}` at script top level — that's a script-scope
+  // binding, not on contextified globalThis, so we can't mutate via _ctx.DB.
+  // Instead, hand the overrides over and run a small script inside the context
+  // that mutates DB through its lexical scope.
+  const cardOverrides = [];
   for (const e of _catalog.cards) {
     const ann = localCardAnnotations[e.codex.id];
     if (!ann) continue;
-    const color = e.codex.color;
-    if (!DB.cards[color]) DB.cards[color] = {};
-    DB.cards[color][e.codex.id] = ann;
+    cardOverrides.push({ color: e.codex.color, id: e.codex.id, ann });
   }
-  // Relic overrides — db.relics is flat by ID.
-  for (const [id, ann] of Object.entries(localRelicAnnotations)) {
-    DB.relics[id] = ann;
-  }
-  // Rebuild DB.names so any newly-added entries are picked up by name searches.
-  if (typeof _ctx.ensureDbNames === 'function') _ctx.ensureDbNames();
+  const relicOverrides = Object.entries(localRelicAnnotations).map(([id, ann]) => ({ id, ann }));
+
+  _ctx.__cardOverrides = cardOverrides;
+  _ctx.__relicOverrides = relicOverrides;
+  vm.runInContext(`
+    for (const o of __cardOverrides) {
+      if (!DB.cards[o.color]) DB.cards[o.color] = {};
+      DB.cards[o.color][o.id] = o.ann;
+    }
+    for (const o of __relicOverrides) {
+      DB.relics[o.id] = o.ann;
+    }
+    if (typeof ensureDbNames === 'function') ensureDbNames();
+    // Clean up the helper bindings.
+    delete globalThis.__cardOverrides;
+    delete globalThis.__relicOverrides;
+  `, _ctx);
 }
 
 function init() {
