@@ -102,6 +102,21 @@ export const localRelicAnnotations = {
     // No scoreEffects: the 14 block is fixed and doesn't scale any card class.
   },
 
+  // Override: Shunrai's Captain's Wheel has scoreEffects {tags:['block'], bonus:0.4}.
+  // Same fixed-defensive-resource pattern — gives 18 block on turn 3, doesn't scale
+  // block cards in your deck. The "more block helps you survive to turn 3" connection
+  // is too indirect to justify a persistent per-card boost.
+  CAPTAINS_WHEEL: {
+    id: "Captain's Wheel",
+    tier: 'A',
+    char: 'any',
+    rarity: 'rare',
+    syn: ['block'],
+    builds: ['any'],
+    notes: 'Gain 18 Block at start of Turn 3. Strong in long fights (elites, bosses); less impactful in fights ending earlier.',
+    // No scoreEffects: the 18 block is fixed and doesn't scale block cards.
+  },
+
   // Add ancient relics from v0.103+ as they show up in real runs:
   //   FISHING_ROD, HEFTY_TABLET, KALEIDOSCOPE, NEOWS_BONES, NEOWS_TALISMAN,
   //   PHIAL_HOLSTER, SILKEN_TRESS, WINGED_BOOTS

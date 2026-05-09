@@ -52,6 +52,9 @@ Entry format:
 - **Anchor** (+5 on block/strength) — fixed 10 block at combat start. Doesn't scale any card class.
 - **Whetstone** (+0.2 on damage) — one-time upgrade of 2 random Attacks on pickup. Post-pickup: zero ongoing impact. Small bonus, still incorrect.
 - **Horn Cleat** (+5 on block/strength) — fixed 14 block on turn 2. Same Anchor-style bug.
+- **Captain's Wheel** (+0.4 on block) — fixed 18 block on turn 3. Same persistent-but-fixed pattern; "block helps you survive to turn 3" connection is too indirect to justify a per-card bonus.
+
+**General principle:** persistence ≠ card-scaling. A relic that runs every combat (Anchor, Horn Cleat, Captain's Wheel, etc.) but provides a *fixed* number doesn't multiply card values; it's a flat defensive (or offensive) resource. scoreEffects should only fire when the relic *amplifies* something proportional to a card class.
 
 **Audit candidate — not yet decided:**
 
