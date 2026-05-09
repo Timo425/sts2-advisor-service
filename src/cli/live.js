@@ -12,7 +12,7 @@ import {
   extractRemovalService,
 } from '../lib/stsmcpAdapter.js';
 import { updateFromCombat, getSnapshot } from '../lib/deckCache.js';
-import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition } from '../advisor/shunraiAdapter.js';
+import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition, analyzeDeck as adapterAnalyzeDeck } from '../advisor/shunraiAdapter.js';
 
 // Match Shunrai-style canonical ID format (uppercase, _-separated, no punctuation).
 const nameKey = (s) => (s ?? '').toString().toUpperCase().replace(/\+$/, '').replace(/[\s\-]/g, '_').replace(/[^A-Z0-9_]/g, '');
@@ -438,6 +438,14 @@ async function tick() {
 
   if (firstRelicCheck) {
     firstRelicCheck = false;
+    // Baseline deck context — same archetypes / roles view used on decision screens,
+    // so the startup output is consistent with what you'll see later.
+    if (cache && character) {
+      const da = adapterAnalyzeDeck(character, deck);
+      const comp = analyzeDeckComposition(character, deck);
+      console.log(`[${stamp()}] ${dim('deck context:')}`);
+      console.log(fmtDeckLine(cache, da, comp));
+    }
     if (relicList.length && character) {
       console.log(`[${stamp()}] ${dim(`relics in play (${relicList.length}):`)}`);
       const offered = relicList.map(r => ({ id: r.id, name: r.name }));
