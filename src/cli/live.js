@@ -12,7 +12,7 @@ import {
   extractRemovalService,
 } from '../lib/stsmcpAdapter.js';
 import { updateFromCombat, getSnapshot } from '../lib/deckCache.js';
-import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition, analyzeDeck as adapterAnalyzeDeck } from '../advisor/shunraiAdapter.js';
+import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition, analyzeDeck as adapterAnalyzeDeck, findCardsInText } from '../advisor/shunraiAdapter.js';
 
 // Match Shunrai-style canonical ID format (uppercase, _-separated, no punctuation).
 const nameKey = (s) => (s ?? '').toString().toUpperCase().replace(/\+$/, '').replace(/[\s\-]/g, '_').replace(/[^A-Z0-9_]/g, '');
@@ -376,6 +376,77 @@ function reportCardSelect(state) {
   }
 }
 
+function reportEvent(state) {
+  const event = state.event ?? {};
+  const options = event.options ?? [];
+  const character = mapCharacter(state?.player?.character);
+  const floor = state?.run?.floor ?? 1;
+  const cache = getSnapshot();
+  const deck = cache?.deckCards ?? [];
+  const equippedRelics = extractEquippedRelicIds(state);
+
+  console.log(fmtHeader(`EVENT: ${event.event_name ?? '?'}`, state));
+  if (cache && character) {
+    const da = adapterAnalyzeDeck(character, deck);
+    const comp = analyzeDeckComposition(character, deck);
+    console.log(fmtDeckLine(cache, da, comp));
+  } else {
+    console.log(fmtDeckLine(cache, undefined, undefined));
+  }
+
+  // Per-option card extraction + grading.
+  const items = [];
+  for (const opt of options) {
+    if (opt.is_locked || opt.is_proceed || opt.was_chosen) {
+      items.push({ opt, grade: null });
+      continue;
+    }
+    const text = `${opt.title ?? ''}\n${opt.description ?? ''}`;
+    const cards = findCardsInText(text);
+    let grade = null;
+    if (cards.length === 1 && character) {
+      const { grades } = gradeCardOfferings({
+        character, deck,
+        offered: [{ id: cards[0].codexId, name: cards[0].name }],
+        floor, equippedRelics,
+      });
+      grade = grades[0];
+    }
+    items.push({ opt, grade });
+  }
+
+  const gradeable = items.filter(i => i.grade);
+  const rec = gradeable.length >= 1
+    ? pickBest(gradeable.map(i => i.grade), g => g.finalScore, { canSkip: false })
+    : null;
+  const bestSet = rec ? new Set(rec.picks) : new Set();
+
+  if (rec && rec.picks.length && gradeable.length >= 2) {
+    const line = fmtPickLine('Pick', rec.picks, g => g.name, g => ({ grade: g.finalGrade ?? '?', score: g.finalScore ?? 0 }));
+    if (line) console.log(line);
+  }
+  console.log();
+
+  // Show options sorted by grade descending (graded ones first), preserving original
+  // order among ungraded options for in-game cross-reference.
+  const sorted = [...items].sort((a, b) => {
+    if (a.grade && b.grade) return (b.grade.finalScore ?? 0) - (a.grade.finalScore ?? 0);
+    if (a.grade) return -1;
+    if (b.grade) return 1;
+    return 0;
+  });
+
+  for (const item of sorted) {
+    const idx = item.opt.index ?? '?';
+    const title = item.opt.title ?? `option ${idx}`;
+    const desc = item.opt.description ?? '';
+    const tag = item.opt.is_locked ? dim(' (locked)') : item.opt.was_chosen ? dim(' (already chosen)') : '';
+    console.log(`  ${dim(`option ${idx}:`)} ${bold(title)}${tag}`);
+    if (desc) console.log(`           ${dim(desc)}`);
+    if (item.grade) console.log(fmtCard(item.grade, { isBest: bestSet.has(item.grade) }));
+  }
+}
+
 function reportRelicChoice(state) {
   const character = mapCharacter(state?.player?.character);
   const floor = state?.run?.floor ?? 1;
@@ -420,6 +491,10 @@ function decisionFingerprint(state) {
   if (t === 'card_select') {
     const cs = state.card_select ?? {};
     return `card_select|${cs.screen_type}|${(cs.cards ?? []).map(c => c.id ?? c.name).sort().join(',')}`;
+  }
+  if (t === 'event') {
+    const e = state.event ?? {};
+    return `event|${e.event_id ?? e.event_name ?? '?'}|${(e.options ?? []).map(o => `${o.index}:${o.was_chosen ? 'x' : ''}`).join(',')}`;
   }
   return t;
 }
@@ -504,6 +579,7 @@ async function tick() {
       else if (stateType === 'shop') reportShop(state);
       else if (stateType === 'relic_select' || stateType === 'treasure') reportRelicChoice(state);
       else if (stateType === 'card_select') reportCardSelect(state);
+      else if (stateType === 'event') reportEvent(state);
     }
   }
 }

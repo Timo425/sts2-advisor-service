@@ -205,6 +205,28 @@ export function gradeRemovalForDeck({
   };
 }
 
+// Find any spire-codex card names mentioned in a free-text passage (e.g. an event
+// option description like "Add Exterminate to your Deck"). Used to grade card-
+// pickup events that aren't structured as card_select state. Word-boundary
+// case-sensitive match — STS card names are always capitalized in-game.
+export function findCardsInText(text) {
+  init();
+  if (!text) return [];
+  const out = [];
+  const seen = new Set();
+  for (const e of catalog.cards) {
+    const name = e.codex.name;
+    if (!name || seen.has(name)) continue;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${escaped}\\b`);
+    if (pattern.test(text)) {
+      seen.add(name);
+      out.push({ name, codexId: e.codex.id });
+    }
+  }
+  return out;
+}
+
 // Count cards in the deck by their functional role. Mirrors how scoreCard
 // counts engines / generators / payoffs internally for role-balance reasoning.
 export function analyzeDeckComposition(character, deck) {
