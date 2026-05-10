@@ -14,7 +14,7 @@ Requires Node 18+ and the [STS2_MCP](https://github.com/Gennadiyev/STS2MCP) mod 
 
 ## Dependencies
 
-- **[Shunrai's STS2 Advisor](https://github.com/Shawnrai/Shunrai-s-STS2-Advisor)** (MIT) — vendored at `src/vendor/`, provides the deck-reasoning logic. See [VENDORED.md](VENDORED.md) for pinned commit and license preservation.
+- **[Shunrai's STS2 Advisor](https://github.com/Shawnrai/Shunrai-s-STS2-Advisor)** (MIT) — vendored *unmodified* at `src/vendor/`; provides the deck-reasoning logic. Our corrections and additions (post-snapshot cards, a few patched upstream entries) live in a thin override layer (`src/data/localAnnotations.js`) on top, so Shunrai's code stays untouched and refreshable from upstream. See [VENDORED.md](VENDORED.md) for pinned commit and license preservation.
 - **[spire-codex](https://github.com/ptrlrd/spire-codex)** — referenced via local clone (not bundled), provides canonical card / relic / potion data per game version.
 - **[STS2_MCP](https://github.com/Gennadiyev/STS2MCP)** — STS2 mod that exposes live game state over `localhost:15526`. Install separately into your game's `mods/` folder.
 
