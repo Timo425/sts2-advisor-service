@@ -517,8 +517,11 @@ function decisionFingerprint(state) {
     return `card_select|${cs.screen_type}|${(cs.cards ?? []).map(c => c.id ?? c.name).sort().join(',')}`;
   }
   if (t === 'event') {
+    // Print events once on entry. Multi-phase events (e.g. The Architect, Ancients)
+    // surface options progressively; including options[].was_chosen in the fingerprint
+    // caused re-prints on each phase. event_id alone is stable across phases.
     const e = state.event ?? {};
-    return `event|${e.event_id ?? e.event_name ?? '?'}|${(e.options ?? []).map(o => `${o.index}:${o.was_chosen ? 'x' : ''}`).join(',')}`;
+    return `event|${e.event_id ?? e.event_name ?? '?'}`;
   }
   return t;
 }
