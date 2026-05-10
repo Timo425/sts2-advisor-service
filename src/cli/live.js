@@ -320,25 +320,35 @@ function reportCardSelect(state) {
   if (prompt) console.log(`   ${dim(prompt)}`);
   if (!cards.length) return;
 
-  // Decide whether these are offered cards (add to deck) or deck cards (act on).
-  // - transform/upgrade are deck actions by definition.
-  // - choose is offered by definition.
-  // - simple_select/select are ambiguous (Brain Leech vs shop-removal target picker etc.):
-  //   if a deck cache is available, classify by deck membership.
-  let isOffering;
+  // Mode classification:
+  //   'offering'           — cards are NOT in your deck (event reward, Brain Leech, draft).
+  //                          Grade as offered card additions.
+  //   'removal-ranking'    — deck-card picker, prompt mentions "Remove". Rank by scoreRemoval.
+  //   'card-tier-ranking'  — deck-card picker for any other reason (put on top of draw pile,
+  //                          discard, etc.). Show card tiers as informational.
+  //   'deck-action'        — transform / upgrade (U2 will replace this with real upgrade scoring).
+  let mode;
   if (screenType === 'transform' || screenType === 'upgrade') {
-    isOffering = false;
+    mode = 'deck-action';
   } else if (screenType === 'choose') {
-    isOffering = true;
-  } else if (deck.length > 0) {
-    const deckKeys = new Set(deck.map(c => nameKey(c.name)));
-    const inDeckCount = cards.filter(c => deckKeys.has(nameKey(c.id ?? c.name))).length;
-    isOffering = (inDeckCount / cards.length) < 0.5;
+    mode = 'offering';
   } else {
-    isOffering = true;  // no cache — events are far more common than removal pickers, default to offering
+    let isDeckPicker = false;
+    if (deck.length > 0) {
+      const deckKeys = new Set(deck.map(c => nameKey(c.name)));
+      const inDeckCount = cards.filter(c => deckKeys.has(nameKey(c.id ?? c.name))).length;
+      isDeckPicker = (inDeckCount / cards.length) >= 0.5;
+    }
+    if (!isDeckPicker) {
+      mode = 'offering';
+    } else if (/\bremove\b/i.test(prompt)) {
+      mode = 'removal-ranking';
+    } else {
+      mode = 'card-tier-ranking';
+    }
   }
 
-  if (isOffering) {
+  if (mode === 'offering') {
     const offered = cards.map(c => ({ id: c.id, name: c.name }));
     const equippedRelics = extractEquippedRelicIds(state);
     const { deckAnalysis, grades } = gradeCardOfferings({ character, deck, offered, floor, equippedRelics });
@@ -354,8 +364,7 @@ function reportCardSelect(state) {
     for (const g of sorted) {
       console.log(fmtCard(g, { isBest: bestSet.has(g) }));
     }
-  } else if (screenType === 'select' || screenType === 'simple_select') {
-    // Picker over your own deck cards (e.g. shop removal target) — rank by removal value.
+  } else if (mode === 'removal-ranking') {
     const equippedRelics = extractEquippedRelicIds(state);
     const { candidates } = gradeRemovalForDeck({ character, deck, equippedRelics });
     const offeredKeys = new Set(cards.map(c => nameKey(c.id ?? c.name)));
@@ -369,8 +378,20 @@ function reportCardSelect(state) {
       console.log(`  ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(c.name ?? '?')}`);
       if (c.reason) console.log(`           ${dim(c.reason)}`);
     }
+  } else if (mode === 'card-tier-ranking') {
+    // Deck-card picker that ISN'T a removal screen (e.g. "put a card on top of your Draw Pile").
+    // Show each card's tier in your current deck as informational — no recommendation marker.
+    const equippedRelics = extractEquippedRelicIds(state);
+    const offered = cards.map(c => ({ id: c.id, name: c.name }));
+    const { grades } = gradeCardOfferings({ character, deck, offered, floor, equippedRelics });
+    const sorted = [...grades].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+    console.log(`   ${bold('card tiers in deck:')}`);
+    console.log();
+    for (const g of sorted) {
+      console.log(fmtCard(g));
+    }
   } else {
-    // transform / upgrade: list only — distinct scoring logic not yet implemented.
+    // deck-action: transform / upgrade — distinct scoring logic not yet implemented (U2).
     for (const c of cards) {
       const cost = c.cost != null ? `(${c.cost}) ` : '';
       console.log(`     ${cost}${c.name ?? c.id ?? '?'}`);
