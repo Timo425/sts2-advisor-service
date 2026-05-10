@@ -205,7 +205,18 @@ export function gradeRemovalForDeck({
     if (!c?.name || seen.has(c.name)) continue;
     seen.add(c.name);
     const r = ctx.scoreRemoval(c.name, character, da, deckCards, relicNames);
-    if (r) candidates.push(r);
+    if (!r) continue;
+    // Patch: Shunrai's scoreRemoval flags basic Strike/Defend at S 5.00 regardless of
+    // upgrade level. Upgraded basics are still cuttable, but materially more useful
+    // than unupgraded copies — drop their priority so the unupgraded version is cut first.
+    if (isUpgradedBasic(c.name)) {
+      const original = r.score ?? 0;
+      r.score = Math.max(0, original - 1.7);
+      r.grade = scoreToGrade(r.score);
+      const tag = '[upgraded — cut unupgraded basics first]';
+      r.reason = r.reason ? `${r.reason} ${tag}` : tag;
+    }
+    candidates.push(r);
   }
   candidates.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   return {
@@ -213,6 +224,27 @@ export function gradeRemovalForDeck({
     candidates,
     bestTarget: candidates[0] ?? null,
   };
+}
+
+// Mirror of logic.js's SCORE_GRADE table; used when post-processing scores.
+function scoreToGrade(s) {
+  if (s >= 4.5) return 'S';
+  if (s >= 3.5) return 'A';
+  if (s >= 2.5) return 'B';
+  if (s >= 1.5) return 'C';
+  if (s >= 0.5) return 'D';
+  return 'F';
+}
+
+const STRIKE_EXCEPTIONS = ['shining', 'solar', 'pommel', 'perfected', 'ashen', 'leading', 'setup'];
+function isUpgradedBasic(cardName) {
+  if (!cardName) return false;
+  const lower = String(cardName).toLowerCase();
+  if (!lower.endsWith('+')) return false;
+  const stripped = lower.slice(0, -1).trim();
+  if (stripped === 'defend') return true;
+  if (stripped.includes('strike') && !STRIKE_EXCEPTIONS.some(x => stripped.includes(x))) return true;
+  return false;
 }
 
 // Find any spire-codex card names mentioned in a free-text passage (e.g. an event
