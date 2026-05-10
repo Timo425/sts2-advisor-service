@@ -94,8 +94,9 @@ function fmtCard(g, options = {}) {
   const ungraded = g.annotated ? '' : dim('  (ungraded)');
   const marker = isBest ? cyan(bold('▶')) : ' ';
   const priceStr = fmtPrice(price, canAfford);
+  const roleStr = (g.role && ROLE_COLORS[g.role]) ? '  ' + ROLE_COLORS[g.role](g.role) : '';
 
-  const head = `${marker} ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(name)}${ungraded}${priceStr}`;
+  const head = `${marker} ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(name)}${roleStr}${ungraded}${priceStr}`;
   const lines = [head];
 
   if (g.notes && g.notes !== 'Unknown card') {
@@ -178,6 +179,16 @@ const ROLE_BARS = [
   { key: 'payoff',    label: 'payoff   ', color: yellow },
   { key: 'defense',   label: 'defense  ', color: blue },
 ];
+
+// Inline role tag colors, matching the bar palette so the eye links them.
+const ROLE_COLORS = {
+  engine: cyan,
+  generator: green,
+  payoff: yellow,
+  defense: blue,
+  setup: dim,
+  utility: dim,
+};
 
 function fmtDeckLine(cache, deckAnalysis, composition) {
   const lines = [];

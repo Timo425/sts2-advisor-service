@@ -172,10 +172,14 @@ export function gradeCardOfferings({
       relicNames,
     );
     const codexId = typeof item === 'string' ? item : item?.id;
+    // Pull the functional role from the in-vm DB so the UI can show it inline.
+    const data = ctx.getCard(character, friendly);
+    const role = data ? (data.role ?? ctx.getFunctionalRole(data) ?? 'utility') : null;
     return {
       codexId: codexId ?? null,
       name: friendly,
       annotated: codexId ? cardAnnotated(codexId) : false,
+      role,
       ...result,
     };
   });
