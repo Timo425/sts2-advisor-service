@@ -12,7 +12,7 @@ import {
   extractRemovalService,
 } from '../lib/stsmcpAdapter.js';
 import { updateFromCombat, getSnapshot } from '../lib/deckCache.js';
-import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition, analyzeDeck as adapterAnalyzeDeck, findCardsInText } from '../advisor/shunraiAdapter.js';
+import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition, analyzeDeck as adapterAnalyzeDeck, findCardsInText, gradeUpgradePriorities } from '../advisor/shunraiAdapter.js';
 
 // Match Shunrai-style canonical ID format (uppercase, _-separated, no punctuation).
 const nameKey = (s) => (s ?? '').toString().toUpperCase().replace(/\+$/, '').replace(/[\s\-]/g, '_').replace(/[^A-Z0-9_]/g, '');
@@ -408,8 +408,33 @@ function reportCardSelect(state) {
     for (const g of sorted) {
       console.log(fmtCard(g));
     }
+  } else if (screenType === 'upgrade') {
+    // U2: upgrade priority — base card score in deck + upgrade-effect bonus.
+    const equippedRelics = extractEquippedRelicIds(state);
+    const candidateCards = cards.map(c => ({ id: c.id, name: c.name }));
+    const results = gradeUpgradePriorities({ character, deck, equippedRelics, candidateCards, floor });
+    if (!results.length) return;
+    const top = results[0];
+    const topGrade = top.grade ?? '?';
+    console.log(`   ${cyan(bold('▶ Upgrade:'))} ${tierColor(topGrade)(topGrade)} ${top.totalScore.toFixed(2)}  ${bold(top.name)}`);
+    console.log();
+    for (const r of results) {
+      const grade = r.grade ?? '?';
+      const score = r.totalScore.toFixed(2);
+      const marker = (r === top) ? cyan(bold('▶')) : ' ';
+      const roleStr = (r.role && ROLE_COLORS[r.role]) ? '  ' + ROLE_COLORS[r.role](r.role) : '';
+      console.log(`${marker} ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(r.name)}${roleStr}`);
+      for (const reason of r.reasons) {
+        console.log(`           ${green(reason)}`);
+      }
+      if (r.upgradeBonus === 0 && r.hasUpgradeData) {
+        console.log(`           ${dim('upgrade: stat-only changes (no transformative bonus)')}`);
+      } else if (!r.hasUpgradeData) {
+        console.log(`           ${dim('(no upgrade data in spire-codex)')}`);
+      }
+    }
   } else {
-    // deck-action: transform / upgrade — distinct scoring logic not yet implemented (U2).
+    // deck-action: transform — list only, scoring not yet designed.
     for (const c of cards) {
       const cost = c.cost != null ? `(${c.cost}) ` : '';
       console.log(`     ${cost}${c.name ?? c.id ?? '?'}`);

@@ -14,10 +14,10 @@ let ctx = null;
 let catalog = null;
 let cardById = null;
 let relicById = null;
-// Full name index across ALL spire-codex card colors (incl. event/curse/token/status),
-// used by findCardsInText so event-flavour-text can be scanned for cards that aren't
-// in our pickable-only canonical catalog (e.g. Exterminate, Squash — color: 'event').
-let allCardNames = null;
+// Full id-keyed index across ALL spire-codex card colors (incl. event/curse/token/status),
+// used by findCardsInText (event-flavour-text scanning) and gradeUpgradePriorities
+// (upgrade field lookup for cards that aren't in our pickable-only canonical catalog).
+let allCardsById = null;
 
 function applyLocalOverridesToContext(_ctx, _catalog) {
   // db.js declares `const DB = {...}` at script top level — that's a script-scope
@@ -62,11 +62,11 @@ function init() {
   applyLocalOverridesToContext(ctx, catalog);
   cardById = new Map(catalog.cards.map(e => [e.codex.id, e]));
   relicById = new Map(catalog.relics.map(e => [e.codex.id, e]));
-  // Load full codex card list (all colors) for text-matching purposes.
+  // Load full codex card list (all colors) for text-matching + upgrade lookups.
   const fullCodex = loadCodexBetaLatest();
-  allCardNames = fullCodex.cards
-    .filter(c => c.name && c.id)
-    .map(c => ({ name: c.name, id: c.id }));
+  allCardsById = new Map(
+    fullCodex.cards.filter(c => c.id && c.name).map(c => [c.id, c])
+  );
 }
 
 function cardFriendlyName(codexId) {
@@ -268,19 +268,101 @@ function isUpgradedBasic(cardName) {
 // rewards routinely add cards from those pools to the deck.
 export function findCardsInText(text) {
   init();
-  if (!text || !allCardNames) return [];
+  if (!text || !allCardsById) return [];
   const out = [];
   const seen = new Set();
-  for (const { name, id } of allCardNames) {
-    if (seen.has(name)) continue;
+  for (const c of allCardsById.values()) {
+    const name = c.name;
+    if (!name || seen.has(name)) continue;
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`\\b${escaped}\\b`);
     if (pattern.test(text)) {
       seen.add(name);
-      out.push({ name, codexId: id });
+      out.push({ name, codexId: c.id });
     }
   }
   return out;
+}
+
+// Rank cards on an upgrade screen by their value-to-upgrade. Each card's score
+// is its tier-as-a-card-in-current-deck (high-tier cards are played more so
+// upgrading them has more impact), plus a bonus for transformative upgrade
+// effects (energy cost reduction, gaining Innate, etc.) sourced from
+// spire-codex's `upgrade` field.
+export function gradeUpgradePriorities({
+  character,
+  deck = [],
+  equippedRelics = [],
+  candidateCards = [],
+  floor = 1,
+  encounter = 'normal',
+}) {
+  init();
+  const deckCards = normalizeDeck(deck);
+  const relicNames = (equippedRelics ?? []).map(relicToFriendlyName).filter(Boolean);
+  const da = ctx.analyzeDeck(character, deckCards);
+  const act = floor <= 17 ? 1 : floor <= 34 ? 2 : floor <= 50 ? 3 : 4;
+
+  const results = candidateCards.map(card => {
+    const friendly = card.name ?? toFriendlyName(card);
+    const codexId = card.id ?? null;
+    const codexCard = codexId ? allCardsById.get(codexId) : null;
+
+    // Base score: how good is this card in the current deck context.
+    const scoreResult = ctx.scoreCard(friendly, character, da, floor, act, deckCards, encounter, relicNames);
+    const baseScore = scoreResult?.finalScore ?? 0;
+    const data = ctx.getCard(character, friendly);
+    const role = data ? (data.role ?? ctx.getFunctionalRole(data) ?? 'utility') : null;
+
+    // Upgrade bonuses: transformative changes that unlock new behaviour.
+    const upgrade = codexCard?.upgrade ?? null;
+    let upgradeBonus = 0;
+    const reasons = [];
+
+    if (upgrade) {
+      // Energy cost reduction is the most impactful upgrade type (more plays per turn).
+      if (typeof upgrade.cost === 'number' && codexCard.cost != null) {
+        const costNow = parseInt(codexCard.cost, 10);
+        const costAfter = upgrade.cost;
+        if (Number.isFinite(costNow) && costAfter < costNow) {
+          const bonus = Math.min(2.0, (costNow - costAfter) * 1.5);
+          upgradeBonus += bonus;
+          reasons.push(`+${bonus.toFixed(1)} cost ${costNow} → ${costAfter}`);
+        }
+      }
+      // Innate gain: comparable to a permanent draw advantage on turn 1.
+      if (upgrade.add_innate === true) {
+        upgradeBonus += 0.6;
+        reasons.push('+0.6 gains Innate');
+      }
+      // Exhaust removal (some upgrades drop the Exhaust keyword) — significant for repeat plays.
+      if (upgrade.remove_exhaust === true) {
+        upgradeBonus += 1.0;
+        reasons.push('+1.0 loses Exhaust');
+      }
+      // Ethereal removal — same reasoning as exhaust removal for retained value.
+      if (upgrade.remove_ethereal === true) {
+        upgradeBonus += 0.8;
+        reasons.push('+0.8 loses Ethereal');
+      }
+    }
+
+    const totalScore = baseScore + upgradeBonus;
+    return {
+      codexId,
+      name: friendly,
+      role,
+      baseScore,
+      upgradeBonus,
+      totalScore,
+      grade: scoreToGrade(totalScore),
+      reasons,
+      hasUpgradeData: upgrade != null,
+    };
+  });
+
+  results.sort((a, b) => b.totalScore - a.totalScore);
+  return results;
 }
 
 // Count cards in the deck by their functional role. Mirrors how scoreCard
