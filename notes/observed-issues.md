@@ -43,6 +43,26 @@ Entry format:
 
 ---
 
+## 2026-05-10 — Bloat pressure should be role/effect-saturation, not flat deck-size
+
+**Note:** an earlier patch (T1, commit `0b9ff85`, reverted in `<follow-up>`) tried to address "Taunt scoring S 6.00 in a 30-card deck" by scaling all card scores down at deckSize ≥ 25 / 30 / 35. That's the wrong mechanism — there's nothing specific about a deck-size threshold, and a flat multiplier punishes useful cards equally with bloat.
+
+**Right model:** scaling-down should follow from the deck already being saturated with the *role* or *effect* a candidate provides. That's archetype-dependent — a Sly/Discard deck wants more cards in total than a Strike deck, so "30 cards" means different things for each.
+
+**What logic.js already does well:**
+- Per-tag `satMult`: when 4+ cards in deck have a synergy tag, additional same-tag synergy bonuses dampen (the `fits X (saturated)` reasons we already see).
+- Some role-balance reasoning (`already 8 generators with no engine — pick up payoffs instead`).
+
+**What's missing or weak (potential future work):**
+- "Always-useful" effects (card draw, exhaust mechanics that compound in any size deck) should be exempt from saturation pressure or even scale *up* in big decks. Currently treated the same as everything else.
+- Role-balance penalties only fire on specific imbalances (e.g. "generators with no engine"); the general principle "you have plenty of this role already, don't take more unless it's outsized" isn't applied uniformly.
+
+**Where the Taunt-at-S-6.00 issue actually lives:** the dominant score contributor was Unsettling Lamp's `+1.4` scoreEffects boost on debuff cards. That relic only doubles the *first* debuff per combat, so the persistent +1.4 is over-weighted regardless of deck size. Routes to the existing Unsettling Lamp note in T3 below.
+
+**Status:** open observation. No mechanical fix for now — logic.js's existing per-tag saturation handles most cases adequately; broader role-saturation refinement and "always-useful" exemptions can come later if patterns surface.
+
+---
+
 ## 2026-05-10 — Cross-card scoring imbalance: Taunt vs Howl from Beyond
 
 **Observation:** in a Strength/Block/Exhaust ironclad deck, scoring put Taunt at S 6.00 and Howl from Beyond at S 5.29. User read Howl as materially stronger in this deck because:
