@@ -183,6 +183,12 @@ export function gradeCardOfferings({
     if (codexId && localCardAnnotations[codexId]) source = 'local';
     else if (data) source = 'shunrai';
     else source = 'none';
+
+    // T1: bloat scaling. Shunrai's logic.js bloat penalty only fires on already-low
+    // scores in big decks; high-tier cards bypass it. Apply a multiplicative scaling
+    // here so all cards feel deck-size pressure consistently.
+    applyBloatScaling(result, deckCards.length);
+
     return {
       codexId: codexId ?? null,
       name: friendly,
@@ -194,6 +200,21 @@ export function gradeCardOfferings({
   });
 
   return { deckAnalysis: da, grades };
+}
+
+function applyBloatScaling(result, deckSize) {
+  if (!result || result.finalScore == null) return;
+  let factor;
+  if (deckSize >= 35) factor = 0.70;
+  else if (deckSize >= 30) factor = 0.85;
+  else if (deckSize >= 25) factor = 0.95;
+  else return;
+  const original = result.finalScore;
+  const scaled = original * factor;
+  const delta = scaled - original;  // negative
+  result.finalScore = scaled;
+  result.finalGrade = scoreToGrade(scaled);
+  result.antiReasons = [...(result.antiReasons ?? []), `${delta.toFixed(1)} deck size ${deckSize} — bloat penalty (×${factor.toFixed(2)})`];
 }
 
 // Evaluate every card in the deck as a removal candidate; return them sorted by
