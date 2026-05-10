@@ -255,8 +255,9 @@ function reportShop(state) {
   const deck = cache?.deckCards ?? [];
 
   const composition = (cache && character) ? analyzeDeckComposition(character, deck) : null;
+  const deckAnalysis = (cache && character) ? adapterAnalyzeDeck(character, deck) : undefined;
   console.log(fmtHeader('SHOP', state));
-  console.log(fmtDeckLine(cache, undefined, composition));
+  console.log(fmtDeckLine(cache, deckAnalysis, composition));
 
   if (offered.length) {
     console.log(`\n  ${bold('CARDS')}`);
@@ -485,8 +486,9 @@ function reportRelicChoice(state) {
   const sorted = [...grades].sort((a, b) => (b.result?.finalScore ?? 0) - (a.result?.finalScore ?? 0));
 
   const composition = (cache && character) ? analyzeDeckComposition(character, deck) : null;
+  const deckAnalysis = (cache && character) ? adapterAnalyzeDeck(character, deck) : undefined;
   console.log(fmtHeader(`${state.state_type.toUpperCase()} (${offeredRelics.length} relics)`, state));
-  console.log(fmtDeckLine(cache, undefined, composition));
+  console.log(fmtDeckLine(cache, deckAnalysis, composition));
   if (rec.skip) {
     const top = rec.all[0]?.result;
     console.log(fmtSkipLine(`best offered is only ${top?.finalGrade ?? '?'} ${(top?.finalScore ?? 0).toFixed(2)}.`));
