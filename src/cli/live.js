@@ -86,17 +86,23 @@ function fmtPrice(price, canAfford) {
   return canAfford ? '  ' + dim(txt) : '  ' + red(txt + ' (costly)');
 }
 
+function fmtSourceMarker(source) {
+  if (source === 'local') return dim('  (local)');
+  if (source === 'none') return dim('  (no annotation)');
+  return '';  // 'shunrai' is the unmarked baseline
+}
+
 function fmtCard(g, options = {}) {
   const { isBest = false, price = null, canAfford = true } = options;
   const grade = g.finalGrade ?? g.base ?? '?';
   const score = (g.finalScore ?? 0).toFixed(2);
   const name = g.name ?? g.codexId ?? '?';
-  const ungraded = g.annotated ? '' : dim('  (ungraded)');
+  const sourceStr = fmtSourceMarker(g.source);
   const marker = isBest ? cyan(bold('▶')) : ' ';
   const priceStr = fmtPrice(price, canAfford);
   const roleStr = (g.role && ROLE_COLORS[g.role]) ? '  ' + ROLE_COLORS[g.role](g.role) : '';
 
-  const head = `${marker} ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(name)}${roleStr}${ungraded}${priceStr}`;
+  const head = `${marker} ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(name)}${roleStr}${sourceStr}${priceStr}`;
   const lines = [head];
 
   if (g.notes && g.notes !== 'Unknown card') {
@@ -121,13 +127,13 @@ function fmtRelic(g, options = {}) {
   const { isBest = false, price = null, canAfford = true } = options;
   const r = g.result;
   const name = g.name ?? '?';
-  const ungraded = g.annotated ? '' : dim('  (ungraded)');
+  const sourceStr = fmtSourceMarker(g.source);
   const marker = isBest ? cyan(bold('▶')) : ' ';
   const priceStr = fmtPrice(price, canAfford);
-  if (!r) return `${marker} ${dim('?')}      ${bold(name)}${ungraded}${priceStr}`;
+  if (!r) return `${marker} ${dim('?')}      ${bold(name)}${sourceStr}${priceStr}`;
   const grade = r.finalGrade ?? r.base ?? '?';
   const score = (r.finalScore ?? 0).toFixed(2);
-  const head = `${marker} ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(name)}${ungraded}${priceStr}`;
+  const head = `${marker} ${tierColor(grade)(grade)} ${score.padStart(5)}  ${bold(name)}${sourceStr}${priceStr}`;
   const lines = [head];
   if (r.notes) lines.push(`           ${dim(r.notes)}`);
   return lines.join('\n');

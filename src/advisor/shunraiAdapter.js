@@ -175,11 +175,20 @@ export function gradeCardOfferings({
     // Pull the functional role from the in-vm DB so the UI can show it inline.
     const data = ctx.getCard(character, friendly);
     const role = data ? (data.role ?? ctx.getFunctionalRole(data) ?? 'utility') : null;
+    // Annotation source — for trust signaling in the UI.
+    //   'local'   = our localCardAnnotations entry (post-snapshot or override)
+    //   'shunrai' = vendored Shunrai db.cards entry (logic.js's getCard found it)
+    //   'none'    = no annotation; logic.js fell back to "Unknown card" C/2 default
+    let source;
+    if (codexId && localCardAnnotations[codexId]) source = 'local';
+    else if (data) source = 'shunrai';
+    else source = 'none';
     return {
       codexId: codexId ?? null,
       name: friendly,
       annotated: codexId ? cardAnnotated(codexId) : false,
       role,
+      source,
       ...result,
     };
   });
@@ -304,13 +313,19 @@ export function gradeRelicOfferings({
     const friendly = relicToFriendlyName(item);
     const codexId = typeof item === 'string' ? item : item?.id;
     if (!friendly) {
-      return { codexId: codexId ?? null, name: '?', annotated: false, result: null };
+      return { codexId: codexId ?? null, name: '?', annotated: false, source: 'none', result: null };
     }
     const result = ctx.scoreRelic(friendly, character, da, deckCards);
+    // scoreRelic returns null when DB.relics[key] is missing — that's the no-annotation case.
+    let source;
+    if (codexId && localRelicAnnotations[codexId]) source = 'local';
+    else if (result) source = 'shunrai';
+    else source = 'none';
     return {
       codexId: codexId ?? null,
       name: friendly,
       annotated: codexId ? relicAnnotated(codexId) : false,
+      source,
       result,
     };
   });
