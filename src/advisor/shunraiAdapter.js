@@ -184,6 +184,12 @@ export function gradeCardOfferings({
     else if (data) source = 'shunrai';
     else source = 'none';
 
+    // T2: extra dupe penalty for high-cost cards. logic.js's base dupe penalty
+    // (-0.8, scaled ×1.4 for 2+ owned) ignores cost. A 2nd Bludgeon (3-cost) is
+    // strictly more punishing than a 2nd Strike (1-cost) because of the energy
+    // bottleneck. Stack on top of logic.js's penalty.
+    applyHighCostDupePenalty(result, codexId, friendly, deckCards);
+
     // T1: bloat scaling. Shunrai's logic.js bloat penalty only fires on already-low
     // scores in big decks; high-tier cards bypass it. Apply a multiplicative scaling
     // here so all cards feel deck-size pressure consistently.
@@ -200,6 +206,30 @@ export function gradeCardOfferings({
   });
 
   return { deckAnalysis: da, grades };
+}
+
+function applyHighCostDupePenalty(result, codexId, friendly, deckCards) {
+  if (!result || result.finalScore == null || !codexId) return;
+  const codexCard = allCardsById?.get(codexId);
+  if (!codexCard) return;
+  const cost = parseInt(codexCard.cost, 10);
+  if (!Number.isFinite(cost) || cost < 2) return;
+
+  // Match by normalized name, ignoring upgrade suffix (Strike and Strike+ are
+  // the same card identity for dupe purposes).
+  const dupeKey = (n) => ctx.norm(String(n ?? '')).replace(/\+$/, '');
+  const targetKey = dupeKey(friendly);
+  const owned = deckCards.filter(c => dupeKey(c.name) === targetKey).length;
+  if (owned === 0) return;
+
+  // cost 2 → modest extra; cost 3+ → severe (Bludgeon scenario).
+  const penalty = cost === 2 ? -0.5 : -1.5;
+  result.finalScore = result.finalScore + penalty;
+  result.finalGrade = scoreToGrade(result.finalScore);
+  result.antiReasons = [
+    ...(result.antiReasons ?? []),
+    `${penalty.toFixed(1)} ${cost}-cost card — extra dupe penalty (energy bottleneck)`,
+  ];
 }
 
 function applyBloatScaling(result, deckSize) {
