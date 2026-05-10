@@ -43,6 +43,27 @@ Entry format:
 
 ---
 
+## 2026-05-10 — Cross-card scoring imbalance: Taunt vs Howl from Beyond
+
+**Observation:** in a Strength/Block/Exhaust ironclad deck, scoring put Taunt at S 6.00 and Howl from Beyond at S 5.29. User read Howl as materially stronger in this deck because:
+
+- The deck already had ample block (defense=7) and the user applied vulnerable from multiple sources, so Taunt's +1 vulnerable is barely felt.
+- Howl is an engine: 16 AoE damage that *replays itself from exhaust every turn for free* once played. With multiple cards that exhaust-payoff (Ashen Strike, Dark Embrace, Feel No Pain), each replay also stacks exhaust value.
+
+**Specific weight suspicions (need more data before acting):**
+
+- `Unsettling Lamp boosts weak/vulnerable/debuff cards` fired at +1.4 on Taunt. The relic's actual effect doubles only the *first* debuff per combat — once that's spent, additional debuff cards aren't amplified. The +1.4 may be over-rated as a persistent boost.
+- Howl's combo bonus `+1.0 (passively exhausts every turn)` may undervalue an engine-class card that produces compounding exhaust + damage every turn.
+
+**Proposed approach:** accumulate 2-3 more cases of suspect scoring across runs. If a pattern emerges (e.g. Unsettling Lamp consistently over-weighting debuff cards, or engine-tagged cards consistently undervalued), file a targeted fix:
+
+- Override Unsettling Lamp's scoreEffects bonus magnitude (per the localRelicAnnotations pattern from Anchor / Whetstone / Horn Cleat / Captain's Wheel).
+- Or adjust combo bonus formula in logic.js for `engine`-role cards (would need to rethink without editing vendored code — possibly a post-process layer).
+
+**Status:** open observation, no fix yet. Defer until pattern is clearer.
+
+---
+
 ## 2026-05-09 — Tier disparity between equivalent one-time-pickup relics
 
 **Symptom:** Three relics with one-time-on-pickup effects scored very differently:
