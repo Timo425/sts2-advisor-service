@@ -68,7 +68,7 @@ let lastDeckCachedAtFloor = null;
 let firstRelicCheck = true;
 let lastRelicIds = new Set();
 
-const stamp = () => new Date().toISOString().slice(11, 19);
+const stamp = () => new Date().toTimeString().slice(0, 8);
 
 async function fetchState() {
   try {
