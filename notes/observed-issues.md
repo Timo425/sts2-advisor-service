@@ -171,6 +171,28 @@ The tiers don't reflect actual in-game value. Archaic Tooth's effect (free S-tie
 
 ---
 
+## 2026-05-15 — scoreRemoval missing dimension: universal value (draw / energy / scaling)
+
+**Symptom:** in a Necrobinder run mid-pivot from Soul → Doom (4 Strike + 4 Defend + Bodyguard + Unleash + Capture Spirit + Negative Pulse + Countdown + Danse Macabre at floor 6), the shop's removal ranking put **Capture Spirit at S 5.00 above basic Strike at S 4.50**. Capture Spirit is the deck's only Soul engine and provides 3 Souls = 6 free draws per play; ranking it above 4 unupgraded Strikes contradicts standard "cut starters first" play.
+
+**Why upstream produces this:** Shunrai's scoreRemoval real-card path stacks off-archetype (+2.5 × archStrength), dead-weight (+1.5, when no tag overlap with rest of deck), and conflicts-with-build (+1.8, when card's anti list contains a detected arch). With Doom Stack and Osty/Summon both detected at strength 1.0 and Capture Spirit's `anti: [doom, osty]` matching both, the penalties stacked to ~5.8 → capped at 5.0. Meanwhile basic Strike returns from a hardcoded early branch at fixed 4.5 (with `realNonStrikeAtks ≥ 1`). The two paths use different scales — the formula path can outrun the hardcoded path.
+
+The deeper issue: scoreRemoval considers tier, build fit, dead-weight, conflict, role balance, exhaust-self-thinning, sole-engine/payoff protection, generator-clog, and bloat — but has **no dimension for "this card provides resources useful to any build."** A `draw` tag on Capture Spirit doesn't help in the formula; the formula treats archetype fit and tag overlap as the entire value model.
+
+**Fix (root, not symptom):** add the missing dimension in the override layer (`shunraiAdapter.js::applyUniversalValueRebate`). Tags in `UNIVERSAL_VALUE_TAGS = { draw, card_draw, energy_gain, scaling, retain, block_retain }` rebate -1.0 each from the removal score, capped at -2.0 total. Justification:
+
+- `draw` / `card_draw` / `energy_gain` are STS resource currencies — valuable in every build.
+- `scaling` is late-game generic value — its payoff doesn't depend on archetype.
+- `retain` / `block_retain` keep cards in hand across turns, useful for any payoff timing.
+
+Per-tag rebate of 1.0 brings the worst-case real-card-scoring ceiling from 5.0 to 3.0 for a fully-universal card (e.g. one with both `draw` and `energy_gain`). For Capture Spirit (1 universal tag), 5.0 → 4.0 — below Strike's 4.5, restoring the expected "cut starters first" ordering.
+
+**Status:** patched 2026-05-15. Considered but rejected: capping all real-card removal scores below Strike's hardcoded value; softening the off-archetype penalty when multiple archetypes are detected. Both were per-symptom band-aids that would need more band-aids elsewhere — the user pushed for addressing the underlying scoring gap.
+
+**Future tuning:** the tag list is starting conservative. If a tag like `strength` (Ironclad-specific but build-spanning for any attacker) or `focus` (Defect orb-density) feels like it should rebate too, extend the set. If the per-tag magnitude proves too generous (e.g. universal-value cards get protected from removal when they're genuinely dead in a thin-build), drop from 1.0 to 0.7 or scale by archStrength (less rebate when arch is highly committed and the card is genuinely orphaned).
+
+---
+
 ## 2026-05-15 — Shop removal picker re-graded the deck as if it were a card offering
 
 **Symptom:** clicking the shop's card-removal service triggered a `card_select` state (screen_type=`select`, the full deck). The watcher ran its picker classifier on it and fell through to `card-tier-ranking` mode (the prompt didn't contain "remove" verbatim — STS2's bottomLabel uses different wording or is empty). Output: "card tiers in deck:" with Capture Spirit at top and Strike at the bottom, which reads as "remove the engine before the starter" — the inverse of the right advice.

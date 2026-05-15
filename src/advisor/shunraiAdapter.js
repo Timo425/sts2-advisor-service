@@ -260,6 +260,7 @@ export function gradeRemovalForDeck({
       const tag = '[upgraded — cut unupgraded basics first]';
       r.reason = r.reason ? `${r.reason} ${tag}` : tag;
     }
+    applyUniversalValueRebate(r, character, c.name);
     candidates.push(r);
   }
   candidates.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
@@ -268,6 +269,32 @@ export function gradeRemovalForDeck({
     candidates,
     bestTarget: candidates[0] ?? null,
   };
+}
+
+// Tags that provide value independent of build. Shunrai's scoreRemoval considers
+// archetype fit, dead-weight, conflict, role balance — but has no dimension for
+// "this card provides resources useful to any deck". Result: a card with `draw`
+// or `energy_gain` can land above basic Strike for removal when the deck has
+// pivoted archetypes, because the off-archetype + dead-weight + conflict penalties
+// stack to ~5.0 without crediting the universal value. This adds the missing
+// dimension as an override-layer rebate so basic starters stay the right cut
+// when the deck still has them.
+const UNIVERSAL_VALUE_TAGS = new Set([
+  'draw', 'card_draw', 'energy_gain', 'scaling', 'retain', 'block_retain',
+]);
+
+function applyUniversalValueRebate(result, character, cardName) {
+  if (!result || result.score == null) return;
+  const data = ctx.getCard(character, cardName);
+  if (!data) return;
+  const tags = new Set([...(data.syn || []), ...(data.mech || [])]);
+  const matched = [...tags].filter(t => UNIVERSAL_VALUE_TAGS.has(t));
+  if (matched.length === 0) return;
+  const rebate = Math.min(2.0, matched.length * 1.0);
+  result.score = Math.max(0, result.score - rebate);
+  result.grade = scoreToGrade(result.score);
+  const tag = `[-${rebate.toFixed(1)} provides ${matched.join('+')} — universal value]`;
+  result.reason = result.reason ? `${result.reason} ${tag}` : tag;
 }
 
 // Mirror of logic.js's SCORE_GRADE table; used when post-processing scores.
