@@ -171,6 +171,22 @@ The tiers don't reflect actual in-game value. Archaic Tooth's effect (free S-tie
 
 ---
 
+## 2026-05-15 — Combat-only token cards leaked into deck snapshot (same bug class, different cards)
+
+**Symptom:** on a Necrobinder run, floor-4 card reward screen showed `deck 18 (cached @ floor 4)` with role counts `engine 1 · generator 8 · payoff 1 · defense 4 · +4 util`. Real permanent deck was 12 cards. Wisp (C-tier, role=generator, builds=any) was graded C 2.02 with anti-reasons "+0.5 fits Soul Engine (saturated)" and "-0.5 already 6 generators - clogs hand" — recommendation: Skip. Both reasons leaned on a generator count inflated by phantom tokens.
+
+**Why it happened:** the cached snapshot held 4 Strike + 4 Defend + Bodyguard + Unleash + Capture Spirit + Negative Pulse + **6 Soul**. Souls are tokens added to the draw pile during combat by Capture Spirit ("Add 3 Souls into Draw Pile"); they vanish at combat end but were snapshotted mid-fight from `hand + draw_pile + discard_pile + exhaust_pile`. Same root cause as the 2026-05-09 status-card leak; the earlier fix's `COMBAT_ONLY_STATUS_NAMES` set covered enemy-applied statuses only, not player-generated tokens.
+
+Because Soul has `builds: ["soul"]` and `role: "generator"`, the 6 phantom Souls satisfied the role-balance filter for the detected Soul Engine archetype (`generatorsInDeck` counts cards whose `builds` overlap the top archetype). Real soul-build generator count: 0. Wisp would have been the first one, not the seventh.
+
+**Fix:** added `COMBAT_ONLY_TOKEN_NAMES` filter in `extractDeckFromCombatState`, sourced from spire-codex's `color === "token"` set (Soul, Shiv, plus 12 others — Disintegration, Fuel, Giant Rock, Luminesce, Mind Rot, Sloth, Sweeping Gaze, Waste Away, Sovereign Blade, Minion Strike/Dive Bomb/Sacrifice). Sourcing from codex rather than hardcoding means new tokens land automatically with codex updates.
+
+**Status:** patched 2026-05-15. Old cache (`.cache/last-deck.json`) deleted at the same time; next combat repopulates clean.
+
+**Note for the future:** if a "token" card ever turns out to be a permanent deck member in some edge case (e.g. a relic that copies a token into your real deck), this filter would over-remove. Watch for that scenario; the fix is a deny-list specific carve-out, not loosening the filter.
+
+---
+
 ## 2026-05-09 — Combat-time auto-exhaust relics overrate permanent removal of basics
 
 **Terminology, important:** *exhaust* = card removed from active piles for the rest of *this combat only* (returns next fight). *Removal* = card permanently gone from the deck. The two are distinct game concepts and Shunrai treats them the same (it doesn't).

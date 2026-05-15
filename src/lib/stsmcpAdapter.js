@@ -3,6 +3,8 @@
 // objects for hand/offered. Shunrai's logic.js normalizes friendly names -> snake_case
 // internally and disambiguates by character bucket, so passing names through is fine.
 
+import { loadCodexBetaLatest } from '../data/codexLoader.js';
+
 const CHARACTER_PREFIX = /^The\s+/i;
 
 export function mapCharacter(playerCharacterField) {
@@ -17,6 +19,28 @@ const COMBAT_ONLY_STATUS_NAMES = new Set([
   'wound', 'burn', 'dazed', 'slimed', 'void', 'debris',
 ]);
 
+// Token cards that your *own* cards generate into your piles during combat — Souls (Necrobinder),
+// Shivs (Silent), etc. Same problem as enemy statuses: they sit in hand/draw/discard/exhaust mid-combat
+// but vanish at combat end, so they must not be cached as permanent deck members. Counted as
+// generators by role, they inflate the generator pool and trigger spurious "clogs hand" anti-reasons
+// on legitimate picks. Sourced from spire-codex's `color === "token"` list rather than hardcoded,
+// so new tokens land automatically with codex updates.
+const COMBAT_ONLY_TOKEN_NAMES = (() => {
+  try {
+    const codex = loadCodexBetaLatest();
+    return new Set(
+      codex.cards.filter(c => c.color === 'token' && c.name).map(c => c.name.toLowerCase())
+    );
+  } catch {
+    return new Set();
+  }
+})();
+
+function isCombatOnly(name) {
+  const lower = String(name).toLowerCase();
+  return COMBAT_ONLY_STATUS_NAMES.has(lower) || COMBAT_ONLY_TOKEN_NAMES.has(lower);
+}
+
 export function extractDeckFromCombatState(state) {
   const p = state?.player;
   if (!p) return null;
@@ -29,7 +53,7 @@ export function extractDeckFromCombatState(state) {
     for (const c of p[k]) {
       const name = c?.name ?? c?.id;
       if (!name) continue;
-      if (COMBAT_ONLY_STATUS_NAMES.has(String(name).toLowerCase())) continue;
+      if (isCombatOnly(name)) continue;
       out.push({ name });
     }
   }
