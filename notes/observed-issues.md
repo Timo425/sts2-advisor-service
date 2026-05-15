@@ -171,6 +171,20 @@ The tiers don't reflect actual in-game value. Archaic Tooth's effect (free S-tie
 
 ---
 
+## 2026-05-15 — Shop removal picker re-graded the deck as if it were a card offering
+
+**Symptom:** clicking the shop's card-removal service triggered a `card_select` state (screen_type=`select`, the full deck). The watcher ran its picker classifier on it and fell through to `card-tier-ranking` mode (the prompt didn't contain "remove" verbatim — STS2's bottomLabel uses different wording or is empty). Output: "card tiers in deck:" with Capture Spirit at top and Strike at the bottom, which reads as "remove the engine before the starter" — the inverse of the right advice.
+
+**Why upstream classification didn't help:** `reportCardSelect`'s mode logic falls back to `card-tier-ranking` whenever the prompt doesn't match `/\bremove\b/i` and the offered cards mostly overlap the deck. That's reasonable for events like "put a card on top of your Draw Pile" but wrong for the shop-removal case where the cue isn't in the prompt — it's in the *prior screen*.
+
+**Fix:** track shop-removal context across the state transition. `reportShop` sets `shopRemovalPending = !!removal`. `reportCardSelect` checks the flag for `screen_type=select` and, if set, prints a one-liner pointing back at the SHOP REMOVAL ranking already shown and skips deeper analysis. Flag clears when state leaves the shop ↔ card_select pair so it can't leak into an unrelated picker.
+
+**Why not just fix the classifier?** The shop screen *already* showed a ranked removal recommendation. Re-running it on the picker overlay is redundant even when the classification is right. Suppression is the user-preferred shape ("ignoring removal deck would be consistent with other stuff but maybe its a start"). Non-shop removal pickers (events that purge a card) still fall through to the existing classifier — if those misfire the same way, we'd add a prompt-broadening or another context cue separately.
+
+**Status:** patched 2026-05-15.
+
+---
+
 ## 2026-05-15 — Combat-only token cards leaked into deck snapshot (same bug class, different cards)
 
 **Symptom:** on a Necrobinder run, floor-4 card reward screen showed `deck 18 (cached @ floor 4)` with role counts `engine 1 · generator 8 · payoff 1 · defense 4 · +4 util`. Real permanent deck was 12 cards. Wisp (C-tier, role=generator, builds=any) was graded C 2.02 with anti-reasons "+0.5 fits Soul Engine (saturated)" and "-0.5 already 6 generators - clogs hand" — recommendation: Skip. Both reasons leaned on a generator count inflated by phantom tokens.

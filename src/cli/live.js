@@ -67,6 +67,15 @@ let lastDecisionFingerprint = null;
 let lastDeckCachedAtFloor = null;
 let firstRelicCheck = true;
 let lastRelicIds = new Set();
+// Set in reportShop when the shop offered a card-removal service. Consumed by
+// reportCardSelect on the next state transition: when the user clicks the
+// service, STS2 opens a full-deck NDeckCardSelectScreen overlay (state_type=
+// card_select, screen_type=select). The shop screen already printed the
+// recommended removal target — re-running the picker advisor over the deck
+// here is redundant and (worse) the heuristic mode classification has misfired
+// in practice, scoring high-tier cards above starters. Suppress with a pointer
+// back to the shop output instead.
+let shopRemovalPending = false;
 
 const stamp = () => new Date().toTimeString().slice(0, 8);
 
@@ -302,6 +311,7 @@ function reportShop(state) {
       console.log(head);
     }
   }
+  shopRemovalPending = !!removal;
   if (removal) {
     console.log(`\n  ${bold('REMOVAL')} ${fmtPrice(removal.price, removal.can_afford)}`);
     if (!cache || deck.length === 0) {
@@ -337,6 +347,17 @@ function reportCardSelect(state) {
   console.log(fmtHeader(`CARD SELECT (${screenType})`, state));
   if (prompt) console.log(`   ${dim(prompt)}`);
   if (!cards.length) return;
+
+  // Shop's card-removal service opens a full-deck NDeckCardSelectScreen. The
+  // shop screen above already ranked removal targets — re-running the picker
+  // advisor here is redundant, and prompt-based mode detection has misfired
+  // (treating it as card-tier-ranking and showing high-value cards first,
+  // which reads as "remove the engine card before the starter"). Skip.
+  if (shopRemovalPending && screenType === 'select') {
+    console.log(`   ${dim('(shop removal picker — see SHOP REMOVAL above)')}`);
+    shopRemovalPending = false;
+    return;
+  }
 
   // Mode classification:
   //   'offering'           — cards are NOT in your deck (event reward, Brain Leech, draft).
@@ -639,6 +660,11 @@ async function tick() {
     lastStateType = stateType;
     lastFloor = floor;
     lastDecisionFingerprint = null;
+    // Drop the shop-removal hint once we've left the shop ↔ card_select pair —
+    // otherwise it could carry forward and suppress an unrelated card_select.
+    if (stateType !== 'shop' && stateType !== 'card_select') {
+      shopRemovalPending = false;
+    }
   }
 
   // Decision-state grading — print only when the offering itself changes
