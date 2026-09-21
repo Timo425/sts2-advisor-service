@@ -358,3 +358,47 @@ Enchants (Slither = randomise a card's cost 0–3) are further out still: there 
 - **3a patched + regression-tested** (2026-09-21). `stripDeckSizeModifiers` in `shunraiAdapter.js` reverses the deck-size modifiers when `deckCards.length === 0`, refunding the exact penalty and recomputing the grade letter. Vendored `logic.js` untouched, same post-processing pattern as `applyHighCostDupePenalty`. `test/unknownDeck.test.mjs` pins both directions — the artifact is gone on an empty deck, and a genuinely small (10-card) or large (30-card) deck still collects its penalty, so the modifier itself is not disarmed. Peck on an unknown deck went 0.70 D → 1.00 D.
 - **3b patched** (2026-09-21). `reportEvent` now counts options that were meant to be scored but couldn't be (`!grade && !skipped`). With any such option the Pick line reads `Pick of the N scoreable (M not evaluated)`; when only one option is scoreable it prints `only 1 of N options is scoreable — no recommendation` instead of a Pick. **Verified by inspection, not by test** — `reportEvent` prints to the console and `live.js` starts the watcher at import, so it is not callable from a test without a refactor. Worth extracting the option-partitioning into a pure helper if this area is touched again.
 - **3c still open** — needs a decision on how transforms and enchants should be valued at all.
+
+---
+
+## 2026-09-21 — Cards penalised for belonging to their own build
+
+**Deck state:** floor 9 necrobinder, 13 cards, archetype Osty / Summon (1.00), two doom cards in deck.
+
+**Bad recommendation:** Rattle printed two contradictory lines in the same block:
+
+```
+▶ S  6.00  Rattle  payoff
+            +0.8  core Osty / Summon card
+            -0.7  actively hurts your osty cards
+```
+
+**Cause — vendored data, not logic.** `vendor/logic.js:177-183`:
+
+```js
+for (const tag of (data.anti || [])) {
+  if (da.unionCount(tag) >= 2) { score -= 0.7; antiR.push(`-0.7 actively hurts your ${tag} cards`); }
+}
+```
+
+The message just echoes the tag. `db.cards.necrobinder.RATTLE` is `builds: ['osty']`, `syn: ['osty', ...]`, `anti: ['soul', 'osty']` — `osty` sits on both sides, so a card that *defines* the Osty build penalises itself for the deck being an Osty deck.
+
+**Audit:** 10 of 591 entries list a tag in both `builds`/`syn` and `anti`. Necrobinder has the most (5), which is why it surfaced in a Necrobinder run:
+
+| card | clash | side |
+|---|---|---|
+| RATTLE, DEVOUR_LIFE, DIRGE | `osty` | builds |
+| FLATTEN | `soul` | builds |
+| NEUROSURGE | `doom` | builds |
+| BURST, STORM_OF_STEEL, DECISIONS_DECISIONS | `shiv` / `sly` / `forge` | builds |
+| ANGER, STOKE | `exhaust` / `self_damage` | syn only |
+
+**Fixed (3):** RATTLE, DEVOUR_LIFE, DIRGE — the card text settles it outright ("Osty deals 7 damage, hits again for each other time he has attacked", "Whenever you play a Soul, Summon 1", "Summon 3 X times"). Entries copied into `localCardAnnotations` verbatim with only the offending `anti` tag dropped. Rattle now scores 6.00 S with no self-contradiction.
+
+**Left alone (7):** ambiguous about *which* side is wrong. Flatten is the clearest example — its text is purely Osty ("Osty deals 12 damage, costs 0 if Osty has attacked"), so the error may be the `soul` entry in `builds` rather than the one in `anti`. Fixing these needs a play call, not a text read.
+
+**Not a bug — the Bone Shards case.** `BONE_SHARDS` is `builds: ['osty']`, `anti: ['doom', 'soul']`. No overlap, so "-0.7 actively hurts your doom cards" is the mechanism working as designed: the deck holds 2+ doom cards and this card works against them.
+
+Whether that's *useful* is a separate question. Note logic.js has two anti mechanisms: lines 167-176 scale the penalty by detected-archetype strength, while 177-183 apply a flat -0.7 on a raw `unionCount(tag) >= 2` regardless of whether that archetype was ever detected. So in a committed Osty deck, two leftover doom cards dock the core Osty payoff a flat 0.7 — when the actual advice should be to cut the doom cards. Worth revisiting if it keeps distorting picks; the detected-archetype version is the better-behaved of the two.
+
+**Status:** 3 patched + regression-tested (`test/antiTags.test.mjs`, which also carries a canary asserting the 7 known contradictions still number 7 — so a re-vendor or a later fix trips it). The flat-penalty design question is open.

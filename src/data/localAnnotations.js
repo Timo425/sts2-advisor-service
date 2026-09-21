@@ -70,6 +70,66 @@ export const localCardAnnotations = {
   },
 };
 
+// --- Overrides: cards whose upstream entry lists a tag in both `builds`/`syn` and `anti` ---
+//
+// logic.js applies -0.7 "actively hurts your <tag> cards" whenever an offered card's `anti`
+// contains a tag the deck holds 2+ of. When `anti` repeats the card's own build tag, a core
+// build card penalises itself for belonging to the build it defines. Observed 2026-09-21:
+// Rattle scored "+0.8 core Osty / Summon card" and "-0.7 actively hurts your osty cards"
+// in the same breath.
+//
+// An audit of all 591 entries found 10 such self-contradictions; the three fixed here are
+// the ones whose card text settles the question outright. The remaining seven — FLATTEN,
+// NEUROSURGE, BURST, STORM_OF_STEEL, DECISIONS_DECISIONS, ANGER, STOKE — are ambiguous
+// about *which* side is wrong (Flatten's text is pure Osty, so its `soul` build tag may be
+// the error rather than its `anti`), and are deliberately left alone pending a play call.
+//
+// Entries are copied from the vendored db verbatim with only the offending `anti` tag
+// dropped, since the override layer replaces the whole entry.
+
+export const localCardAntiFixes = {
+  RATTLE: {
+    id: 'Rattle',
+    tier: 'A',
+    builds: ['osty'],
+    syn: ['osty', 'multi_hit', 'scaling'],
+    anti: ['soul'], // was ['soul', 'osty'] — "Osty deals 7 damage, hits again for each
+                    // other time he has attacked this turn" is the archetypal Osty payoff.
+    notes: 'Osty deals 7 damage. Hits again for each other time Osty attacked this turn. A-tier payoff — with Fetch and Sic Em setting up, Rattle becomes massive multi-hit.',
+    mech: ['osty_atk', 'multi_hit', 'per_attack_payoff'],
+    role: 'payoff',
+  },
+
+  DEVOUR_LIFE: {
+    id: 'Devour Life',
+    tier: 'A',
+    builds: ['soul', 'osty'],
+    syn: ['soul', 'osty', 'summon'],
+    anti: ['doom'], // was ['doom', 'osty'] — "Whenever you play a Soul, Summon 1" grows
+                    // Osty directly; anti-doom is plausible and kept.
+    notes: 'Whenever you play a Soul, Summon 1. A-tier passive — every Soul played grows Osty. In Soul-heavy builds, Osty grows to enormous HP passively.',
+    mech: ['summon', 'passive'],
+    role: 'engine',
+  },
+
+  DIRGE: {
+    id: 'Dirge',
+    tier: 'D',
+    builds: ['soul', 'osty'],
+    syn: ['soul', 'summon', 'exhaust', 'scaling'],
+    anti: ['doom'], // was ['doom', 'osty'] — "Summon 3 X times, add X Souls" is a summon
+                    // generator; anti-doom kept.
+    notes: 'Make X Souls + raise Osty\'s HP. Setup card for soul+osty combo.',
+    mech: ['soul_generator', 'osty_buff', 'scaling'],
+    role: 'generator',
+  },
+};
+
+// Folded in rather than exported separately: both the adapter's in-vm DB injection and
+// canonicalLoader look cards up through localCardAnnotations, so merging here means the
+// overrides reach the scorer with no wiring changes.
+Object.assign(localCardAnnotations, localCardAntiFixes);
+
 export const localRelicAnnotations = {
   // Override: Shunrai's Anchor entry has a +5 scoreEffects bonus on tags
   // ['block', 'strength'], which (a) is too large — saturates every offering

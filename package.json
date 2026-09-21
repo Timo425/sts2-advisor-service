@@ -11,7 +11,8 @@
     "live": "node src/cli/live.js",
     "test:deckcache": "node test/deckCache.test.mjs",
     "test:unknowndeck": "node test/unknownDeck.test.mjs",
-    "test": "npm run test:deckcache && npm run test:unknowndeck"
+    "test": "npm run test:deckcache && npm run test:unknowndeck && npm run test:antitags",
+    "test:antitags": "node test/antiTags.test.mjs"
   },
   "engines": {
     "node": ">=18"
