@@ -30,11 +30,18 @@ const deck = [
   'SCOURGE', 'DELAY', 'RATTLE',
 ];
 
+// Wording-agnostic on purpose: rebalanceAntiSynergy rewrites the sub-threshold charge, so
+// asserting on logic.js's exact phrasing would test the string rather than the behaviour.
+// Any negative anti line naming the tag counts as "this card is charged for conflicting
+// with <tag>".
 const hurts = (id, tag) => {
   const { grades } = gradeCardOfferings({
     character: 'necrobinder', deck, offered: [{ id, name: id }], floor: 9, equippedRelics: [],
   });
-  return (grades[0].antiReasons ?? []).some(r => String(r).includes(`actively hurts your ${tag}`));
+  return (grades[0].antiReasons ?? []).some(r => {
+    const text = String(r);
+    return /^-/.test(text) && new RegExp(`\\b${tag}\\b`).test(text);
+  });
 };
 
 ok('Rattle no longer hurts the osty cards it is built around', !hurts('RATTLE', 'osty'));
@@ -45,6 +52,52 @@ ok('Dirge no longer hurts osty', !hurts('DIRGE', 'osty'));
 // self-contradictions, and removing them would be over-correcting.
 ok('a real cross-build conflict still fires (Bone Shards vs doom)', hurts('BONE_SHARDS', 'doom'));
 ok('Devour Life still flags doom', hurts('DEVOUR_LIFE', 'doom'));
+
+// --- anti-synergy rebalance: no double charge, ramp instead of cliff ---
+//
+// logic.js bills the same conflict twice once an archetype is detected, and below the
+// threshold it charges a flat -0.7 — more than the -0.4 floor a real-but-weak hybrid
+// would cost. rebalanceAntiSynergy fixes both in the adapter.
+
+const ostyBase = [
+  'STRIKE_NECROBINDER', 'STRIKE_NECROBINDER', 'STRIKE_NECROBINDER',
+  'DEFEND_NECROBINDER', 'DEFEND_NECROBINDER',
+  'POKE', 'SIC_EM', 'FETCH', 'RATTLE',
+];
+const doomPool = ['SCOURGE', 'DELAY', 'DEBILITATE', 'COUNTDOWN'];
+
+const boneShards = n => {
+  const deck = [...ostyBase, ...doomPool.slice(0, n)];
+  const { grades } = gradeCardOfferings({
+    character: 'necrobinder', deck, offered: [{ id: 'BONE_SHARDS', name: 'BONE_SHARDS' }],
+    floor: 9, equippedRelics: [],
+  });
+  const g = grades[0];
+  const anti = (g.antiReasons ?? []).map(String);
+  const doomLines = anti.filter(r => /doom/.test(r) && /^-/.test(r));
+  const doomTotal = doomLines.reduce((s, r) => s + parseFloat(r.match(/^-?\d+(?:\.\d+)?/)?.[0] ?? 0), 0);
+  return { score: g.finalScore ?? 0, anti, doomLines, doomTotal };
+};
+
+const d1 = boneShards(1);
+const d2 = boneShards(2);
+const d3 = boneShards(3);
+
+ok('a single off-build card is not treated as a conflict', d1.doomLines.length === 0);
+
+ok('two off-build cards cost something', d2.doomLines.length === 1);
+ok('...but strictly less than the detected-archetype floor of -0.4',
+  Math.abs(d2.doomTotal) < 0.4);
+ok('...and it names the count rather than claiming a build conflict',
+  /2 doom cards in deck/.test(d2.doomLines[0] ?? ''));
+
+// The conflicting archetype is detected at 3 cards, so only the scaled loop should bill.
+ok('a detected conflict is charged once, not twice',
+  d3.anti.filter(r => /actively hurts your doom/.test(r)).length === 0);
+ok('the scaled charge survives', d3.anti.some(r => /conflicts with .*\(has doom\)/.test(r)));
+
+ok('the penalty is monotone in the number of conflicting cards',
+  d1.score >= d2.score && d2.score > d3.score);
 
 // Canary over the vendored data. Seven entries still list a tag in both `builds`/`syn` and
 // `anti`; they were left alone because the card text doesn't settle which side is wrong.

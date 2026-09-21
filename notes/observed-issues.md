@@ -402,3 +402,20 @@ The message just echoes the tag. `db.cards.necrobinder.RATTLE` is `builds: ['ost
 Whether that's *useful* is a separate question. Note logic.js has two anti mechanisms: lines 167-176 scale the penalty by detected-archetype strength, while 177-183 apply a flat -0.7 on a raw `unionCount(tag) >= 2` regardless of whether that archetype was ever detected. So in a committed Osty deck, two leftover doom cards dock the core Osty payoff a flat 0.7 — when the actual advice should be to cut the doom cards. Worth revisiting if it keeps distorting picks; the detected-archetype version is the better-behaved of the two.
 
 **Status:** 3 patched + regression-tested (`test/antiTags.test.mjs`, which also carries a canary asserting the 7 known contradictions still number 7 — so a re-vendor or a later fix trips it). The flat-penalty design question is open.
+
+**Follow-up 2026-09-21 — the flat penalty rebalanced.** Measured the curve for Bone Shards (anti: doom) against an Osty deck as doom cards were added:
+
+| doom cards | detected | before | after |
+|---|---|---|---|
+| 0–1 | — | 0 | 0 |
+| 2 | — | **−0.7** | **−0.24** |
+| 3+ | Doom Stack (1.00) | **−0.9 *and* −0.7** (capped −1.5) | **−0.9** |
+
+Two defects, both now handled in `rebalanceAntiSynergy` (adapter post-process; vendored `logic.js` untouched):
+
+- **Double charge.** Above the detection threshold both loops bill for the same conflict. The flat charge is now dropped whenever the tag belongs to a detected archetype — loop 1 already priced it, with strength scaling.
+- **Inverted cliff.** Below the threshold the flat −0.7 exceeded the −0.4 floor of a *detected* weak hybrid, so two stray cards cost more than a real emerging build. Replaced with `−min(0.35, 0.12 × count)`, which ramps and stays strictly under −0.4. One off-build card is now free; it is noise, not a conflict.
+
+Hybrids fall out correctly rather than being special-cased: a genuine second archetype gets *detected*, so it is priced by the scaled loop at its real strength. The flat rule only ever covers the sub-threshold tail — the couple of cards picked up half by accident, which was the case that prompted this.
+
+**Still open — weighting by the quality of the conflicting cards.** The user's suggestion: if those two doom cards are low-tier and off-build, they will be cut, so they should not constrain future picks at all. Sound, but a second-order heuristic on top of what was a first-order bug, and hard to validate without more data. Revisit if off-build leftovers keep distorting picks.

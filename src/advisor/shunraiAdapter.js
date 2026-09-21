@@ -188,6 +188,7 @@ export function gradeCardOfferings({
     // (-0.8, scaled ×1.4 for 2+ owned) ignores cost. A 2nd Bludgeon (3-cost) is
     // strictly more punishing than a 2nd Strike (1-cost) because of the energy
     // bottleneck. Stack on top of logic.js's penalty.
+    rebalanceAntiSynergy(result, da);
     applyHighCostDupePenalty(result, codexId, friendly, deckCards);
 
     // No snapshot means no deck, not a small deck — see stripDeckSizeModifiers.
@@ -204,6 +205,83 @@ export function gradeCardOfferings({
   });
 
   return { deckAnalysis: da, grades };
+}
+
+// logic.js charges for anti-synergy twice over, in two loops that don't know about each
+// other (vendor/logic.js:165-184):
+//
+//   1. per *detected* archetype   → -(0.4 + strength*0.5), i.e. -0.4 … -0.9
+//   2. per anti tag with 2+ cards → a flat -0.7, regardless of detection
+//
+// Measured on an Osty deck with Bone Shards offered (anti: doom):
+//
+//   doom cards | detected        | charged
+//   0-1        | —               | 0
+//   2          | —               | -0.7
+//   3+         | Doom Stack 1.00 | -0.9 and -0.7 together (capped at -1.5)
+//
+// Two things wrong. Above the detection threshold both loops bill for the same conflict.
+// Below it there is a cliff rather than a ramp — and an inverted one: two stray cards cost
+// -0.7 while a real-but-weak hybrid, which is a stronger signal, would cost only -0.4.
+//
+// This rebalances after the fact, leaving vendored logic.js alone:
+//   - tag belongs to a detected archetype → drop the flat charge, loop 1 already covered it
+//   - otherwise → scale with the count and stay strictly under loop 1's -0.4 floor
+//
+// Hybrids are handled by construction: a genuine second archetype gets *detected*, so it is
+// priced by loop 1 with its real strength. The flat rule only ever covers the sub-threshold
+// tail — the couple of off-build cards picked up half by accident.
+const ANTI_CONFLICT_RE = /conflicts with .+ \(has .+\)/;
+const ANTI_HURTS_RE = /actively hurts your (.+?) cards/;
+const ANTI_CAP = -1.5; // logic.js clamps the summed anti penalty here
+
+function rebalanceAntiSynergy(result, da) {
+  const reasons = result?.antiReasons;
+  if (!Array.isArray(reasons) || result.finalScore == null) return;
+  if (!reasons.some(r => ANTI_HURTS_RE.test(String(r)))) return;
+
+  const magnitude = r => {
+    const m = String(r).match(/^-?\d+(?:\.\d+)?/);
+    return m ? parseFloat(m[0]) : 0;
+  };
+  const counted = r => ANTI_CONFLICT_RE.test(String(r)) || ANTI_HURTS_RE.test(String(r));
+
+  // Tags already priced by loop 1, via the archetypes it actually detected.
+  const detectedTags = new Set();
+  for (const d of da?.detected ?? []) {
+    for (const t of [...(d?.arch?.core ?? []), ...(d?.arch?.support ?? [])]) detectedTags.add(t);
+  }
+
+  const before = reasons.filter(counted).reduce((sum, r) => sum + magnitude(r), 0);
+
+  const kept = [];
+  let after = 0;
+  for (const r of reasons) {
+    const text = String(r);
+    const hurts = text.match(ANTI_HURTS_RE);
+    if (!hurts) {
+      kept.push(r);
+      if (counted(r)) after += magnitude(r);
+      continue;
+    }
+    const tag = hurts[1];
+    if (detectedTags.has(tag)) continue; // double charge — loop 1 already billed it
+
+    const count = typeof da?.unionCount === 'function' ? (da.unionCount(tag) ?? 0) : 0;
+    if (count < 2) continue; // a single off-build card is noise, not a conflict
+    const pen = -Math.min(0.35, 0.12 * count);
+    after += pen;
+    kept.push(`${pen.toFixed(2)} ${count} ${tag} cards in deck — off-build, below archetype threshold`);
+  }
+
+  // Re-apply logic.js's cap on both sides, or the refund over-pays whenever the original
+  // total had been clamped.
+  const applied = total => Math.max(total, ANTI_CAP);
+  const delta = applied(after) - applied(before);
+  result.antiReasons = kept;
+  if (delta === 0) return;
+  result.finalScore = result.finalScore + delta;
+  result.finalGrade = scoreToGrade(result.finalScore);
 }
 
 // logic.js's "deck size selectivity" reads `da.total`, which is 0 when there is no deck
