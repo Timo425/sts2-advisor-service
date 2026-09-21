@@ -99,7 +99,7 @@ ok('the scaled charge survives', d3.anti.some(r => /conflicts with .*\(has doom\
 ok('the penalty is monotone in the number of conflicting cards',
   d1.score >= d2.score && d2.score > d3.score);
 
-// Canary over the vendored data. Seven entries still list a tag in both `builds`/`syn` and
+// Canary over the vendored data. Six entries still list a tag in both `builds`/`syn` and
 // `anti`; they were left alone because the card text doesn't settle which side is wrong.
 // If this count moves — a re-vendor, or someone fixing more of them — take another look.
 const here = dirname(fileURLToPath(import.meta.url));
@@ -116,11 +116,11 @@ for (const [color, cards] of Object.entries(DB.cards)) {
   }
 }
 
-ok(`exactly 7 known self-contradictions remain (found ${contradictions.length}: ${contradictions.join(', ')})`,
-  contradictions.length === 7);
+ok(`exactly 6 known self-contradictions remain (found ${contradictions.length}: ${contradictions.join(', ')})`,
+  contradictions.length === 6);
 
-ok('none of the three fixed cards is still contradictory',
-  !contradictions.some(x => /RATTLE|DEVOUR_LIFE|DIRGE/.test(x)));
+ok('none of the four fixed cards is still contradictory',
+  !contradictions.some(x => /RATTLE|DEVOUR_LIFE|DIRGE|FLATTEN/.test(x)));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

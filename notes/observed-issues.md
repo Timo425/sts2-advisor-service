@@ -419,3 +419,26 @@ Two defects, both now handled in `rebalanceAntiSynergy` (adapter post-process; v
 Hybrids fall out correctly rather than being special-cased: a genuine second archetype gets *detected*, so it is priced by the scaled loop at its real strength. The flat rule only ever covers the sub-threshold tail — the couple of cards picked up half by accident, which was the case that prompted this.
 
 **Still open — weighting by the quality of the conflicting cards.** The user's suggestion: if those two doom cards are low-tier and off-build, they will be cut, so they should not constrain future picks at all. Sound, but a second-order heuristic on top of what was a first-order bug, and hard to validate without more data. Revisit if off-build leftovers keep distorting picks.
+
+**Follow-up 2026-09-21 (later) — Flatten resolved by play, 7 → 6 remaining.**
+
+A floor-12 reward settled one of the seven. Deck: Osty / Summon, 4 osty, 2 doom, 2 soul, player at 16/66.
+
+| Card | Deck Compass | DIY pipeline |
+|---|---|---|
+| Flatten — *"Osty deals 12 damage. Costs 0 if Osty has attacked this turn"* | C 60, **last** | **S 6.34, first** |
+| Deathbringer — *"Apply 21 Doom and 1 Weak to ALL enemies"* | **S 82, first** | C 2.11 |
+| Debilitate — *"Deal 10 damage. Vulnerable and Weak twice as effective"* | S 67 | C 2.11 |
+
+Play backed the pipeline, and the reasoning checks out independently: Doom is an *execute threshold*, not damage (spire-codex: "at the end of the enemy turn, if this creature has X or less HP, it dies"), so Deathbringer moves nothing toward its own condition — it only collects enemies already there. Flatten is cheap repeat damage that gets enemies to that threshold, and with Poke in deck it is frequently free. Shunrai also caught `-0.8 already have 1 copy` on Debilitate; Deck Compass's S 67 showed no sign of it.
+
+**What this settles:** Flatten's `soul` tag. It sat in `builds`, `syn` *and* `anti`, and the card text has no soul interaction at all — so the answer was neither list, a third option not considered when the seven were triaged. Dropped from all three; `summon` kept, since the card depends on Osty being out and attacking. Score went 6.34 → 6.46 with the `-0.2 2 soul cards in deck` line gone.
+
+The lesson for the remaining six: the fix is not reliably "trust `builds` over `anti`". Check whether the tag belongs anywhere before choosing a side.
+
+**Flagged, not changed** — both would *lower* Flatten and neither is supported by anything but a hunch, while play has just endorsed the current ranking:
+
+- `role: 'engine'` earns it "+0.3 first engine card - unlocks the whole build", but it produces nothing recurring; it is cheap conditional damage. Arguably a payoff.
+- `scaling` in `syn` — 12 flat damage does not scale.
+
+**Status:** 4 of 10 patched, 6 open. Canary in `test/antiTags.test.mjs` updated to 6.

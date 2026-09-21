@@ -78,16 +78,39 @@ export const localCardAnnotations = {
 // Rattle scored "+0.8 core Osty / Summon card" and "-0.7 actively hurts your osty cards"
 // in the same breath.
 //
-// An audit of all 591 entries found 10 such self-contradictions; the three fixed here are
-// the ones whose card text settles the question outright. The remaining seven — FLATTEN,
-// NEUROSURGE, BURST, STORM_OF_STEEL, DECISIONS_DECISIONS, ANGER, STOKE — are ambiguous
-// about *which* side is wrong (Flatten's text is pure Osty, so its `soul` build tag may be
-// the error rather than its `anti`), and are deliberately left alone pending a play call.
+// An audit of all 591 entries found 10 such self-contradictions. Four are fixed here — the
+// ones where the card text settles the question. Six remain: NEUROSURGE, BURST,
+// STORM_OF_STEEL, DECISIONS_DECISIONS, ANGER, STOKE. They stay until play shows which side
+// is wrong, the same way Flatten did.
 //
-// Entries are copied from the vendored db verbatim with only the offending `anti` tag
-// dropped, since the override layer replaces the whole entry.
+// Entries are copied from the vendored db verbatim with only the offending tag dropped,
+// since the override layer replaces the whole entry. Note the fix is not always "trust
+// `builds` over `anti`" — for Flatten the tag belonged in neither list.
 
-export const localCardAntiFixes = {
+export const localCardTagFixes = {
+  // Flatten was one of the seven left alone on 2026-09-21 because the text didn't say
+  // which side of the `soul` contradiction was wrong. A floor-12 reward answered it: the
+  // card reads "Osty deals 12 damage. This card costs 0 if Osty has attacked this turn"
+  // (16 upgraded) and has no soul interaction whatsoever. So `soul` belonged in *neither*
+  // list — a third option not considered the first time round. Dropped from builds, syn
+  // and anti alike; `summon` stays, since the card depends on Osty being out and attacking.
+  //
+  // Left deliberately untouched, both of which would *lower* the score: `role: 'engine'`
+  // (it earns "+0.3 first engine card - unlocks the whole build", but it produces nothing
+  // recurring — it is cheap conditional damage) and `scaling` in syn (12 flat damage does
+  // not scale). Flagged rather than changed, because play has just endorsed the current
+  // ranking and these would push against that on a hunch.
+  FLATTEN: {
+    id: 'Flatten',
+    tier: 'B',
+    builds: ['osty'],
+    syn: ['summon', 'energy_gain', 'scaling'],
+    anti: ['doom'],
+    notes: 'Osty deals 12 damage (16 upgraded), and costs 0 if Osty has already attacked this turn. Cheap repeat damage in an Osty deck — Poke or any other Osty attack turns it free.',
+    mech: ['cost_reduction', 'combo_enabler'],
+    role: 'engine',
+  },
+
   RATTLE: {
     id: 'Rattle',
     tier: 'A',
@@ -128,7 +151,7 @@ export const localCardAntiFixes = {
 // Folded in rather than exported separately: both the adapter's in-vm DB injection and
 // canonicalLoader look cards up through localCardAnnotations, so merging here means the
 // overrides reach the scorer with no wiring changes.
-Object.assign(localCardAnnotations, localCardAntiFixes);
+Object.assign(localCardAnnotations, localCardTagFixes);
 
 export const localRelicAnnotations = {
   // Override: Shunrai's Anchor entry has a +5 scoreEffects bonus on tags
