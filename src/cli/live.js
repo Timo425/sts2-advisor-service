@@ -503,7 +503,7 @@ function reportEvent(state) {
   const items = [];
   for (const opt of options) {
     if (opt.is_locked || opt.is_proceed || opt.was_chosen) {
-      items.push({ opt, grade: null });
+      items.push({ opt, grade: null, skipped: true });
       continue;
     }
     const text = `${opt.title ?? ''}\n${opt.description ?? ''}`;
@@ -521,14 +521,23 @@ function reportEvent(state) {
   }
 
   const gradeable = items.filter(i => i.grade);
+  // Options we were meant to evaluate but couldn't — an enchant ("Enchant 1 card with
+  // Slither") names no card, so findCardsInText returns nothing. Without this count the
+  // Pick line below silently recommends across a subset and reads like a full answer.
+  const unevaluated = items.filter(i => !i.grade && !i.skipped).length;
   const rec = gradeable.length >= 1
     ? pickBest(gradeable.map(i => i.grade), g => g.finalScore, { canSkip: false })
     : null;
   const bestSet = rec ? new Set(rec.picks) : new Set();
 
   if (rec && rec.picks.length && gradeable.length >= 2) {
-    const line = fmtPickLine('Pick', rec.picks, g => g.name, g => ({ grade: g.finalGrade ?? '?', score: g.finalScore ?? 0 }));
+    const label = unevaluated
+      ? `Pick of the ${gradeable.length} scoreable (${unevaluated} not evaluated)`
+      : 'Pick';
+    const line = fmtPickLine(label, rec.picks, g => g.name, g => ({ grade: g.finalGrade ?? '?', score: g.finalScore ?? 0 }));
     if (line) console.log(line);
+  } else if (unevaluated && gradeable.length === 1) {
+    console.log(`   ${dim(`only 1 of ${gradeable.length + unevaluated} options is scoreable — no recommendation`)}`);
   }
   console.log();
 

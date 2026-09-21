@@ -190,6 +190,9 @@ export function gradeCardOfferings({
     // bottleneck. Stack on top of logic.js's penalty.
     applyHighCostDupePenalty(result, codexId, friendly, deckCards);
 
+    // No snapshot means no deck, not a small deck — see stripDeckSizeModifiers.
+    if (deckCards.length === 0) stripDeckSizeModifiers(result);
+
     return {
       codexId: codexId ?? null,
       name: friendly,
@@ -201,6 +204,35 @@ export function gradeCardOfferings({
   });
 
   return { deckAnalysis: da, grades };
+}
+
+// logic.js's "deck size selectivity" reads `da.total`, which is 0 when there is no deck
+// snapshot. Zero satisfies its `deckSize <= 16` test, so an *unknown* deck quietly collects
+// the "keep deck lean" penalty as though it were a small one — 0.3 of every score being an
+// artifact of missing information rather than a judgement about the deck. Reverse those
+// modifiers instead of editing vendored logic.js.
+//
+// Absence of a deck is not evidence about its size. Modifiers that fire on *presence* of
+// something (duplicates, archetype fit) correctly do nothing on an empty deck and are left
+// alone; only the ones that fire on a *low count* need undoing.
+const DECK_SIZE_MODIFIERS = [
+  { match: 'keep deck lean', refund: 0.3 },
+  { match: 'large deck', refund: 0.4 },
+];
+
+function stripDeckSizeModifiers(result) {
+  if (!result || result.finalScore == null) return;
+  const kept = [];
+  let refund = 0;
+  for (const reason of result.antiReasons ?? []) {
+    const hit = DECK_SIZE_MODIFIERS.find(m => String(reason).includes(m.match));
+    if (hit) refund += hit.refund;
+    else kept.push(reason);
+  }
+  if (refund === 0) return;
+  result.finalScore = result.finalScore + refund;
+  result.finalGrade = scoreToGrade(result.finalScore);
+  result.antiReasons = kept;
 }
 
 function applyHighCostDupePenalty(result, codexId, friendly, deckCards) {

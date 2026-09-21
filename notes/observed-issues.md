@@ -304,3 +304,57 @@ Removal still has *some* value with Ghost Seed (smaller deck = better draw rate 
 - "Essential gap unfilled" gate: cap non-gap-filling cards below A when the deck is otherwise functional.
 
 **Status:** open. Reproduce, then read logic.js's scoring path.
+
+---
+
+## 2026-09-21 — Event grading: partial recommendation + empty-deck penalty artifact
+
+**Deck state:** floor 4 necrobinder, Wood Carvings event, **no deck snapshot** (watcher had just restarted; cross-run Ironclad cache correctly rejected).
+
+**Bad recommendation:**
+
+```
+▶ Pick: D 0.70  Peck / Toric Toughness  (tied)
+  option 0: Bird   — Choose 1 starter card to Transform into Peck.
+▶ D 0.70  Peck        -0.3 keep deck lean - only take impactful cards
+  option 2: Torus  — Choose 1 starter card to Transform into Toric Toughness.
+▶ D 0.70  Toric Toughness   -0.3 keep deck lean - only take impactful cards
+  option 1: Snake  — Enchant 1 card with Slither.     (no grade at all)
+```
+
+**Three separate problems.**
+
+### 3a. Unknown deck is treated as a lean deck (defect)
+
+`vendor/logic.js:393` — `if (deckSize <= 16 && score < 2.5) { score -= 0.3 }`. With no snapshot `da.total` is 0, and 0 ≤ 16, so the penalty fires. Measured:
+
+| deck | score | modifiers |
+|---|---|---|
+| empty (`deckSize=0`) | 0.70 D | `-0.3 keep deck lean` |
+| 20 cards | 1.00 D | none |
+
+So 0.30 of the displayed score is an artifact of not knowing the deck. Same trap applies to the `deckSize >= 26` branch and to anything else keyed off `da.total`.
+
+**Fix candidate:** when there is no snapshot, suppress every deck-size-dependent modifier rather than letting them read 0 — an unknown deck is not a small deck. Cleanest place is the adapter: pass a `deckKnown: false` flag and gate those branches, rather than patching each call site.
+
+### 3b. A recommendation computed over a subset of the options (defect)
+
+`reportEvent` builds `gradeable = items.filter(i => i.grade)` and runs `pickBest` on that. It guards on `gradeable.length >= 2` but never checks whether any option was left ungraded. Snake produced no grade — `findCardsInText` finds no card name in "Enchant 1 card with Slither" — so the Pick line confidently recommended between two of three options with no indication the third was never looked at.
+
+**Fix candidate:** if `gradeable.length < items.length` (excluding locked / proceed / already-chosen), either drop the Pick line entirely or mark it, e.g. `Pick (of the 2 scoreable options; 1 not evaluated)`. Silence beats a confident partial answer.
+
+### 3c. Transforms and enchants are scored as card additions (design, not a bug)
+
+"Choose 1 starter card to Transform into Peck" does not grow the deck — it *replaces a Strike or Defend*. Scoring it as a plain addition is wrong in kind, and it collects a bloat penalty for the one thing it doesn't do. The value of a transform is roughly `value(new card) − value(the starter it replaces)`, which is usually positive precisely because starters are weak.
+
+The codebase already knows this: the `card_select` path prints `// deck-action: transform — list only, scoring not yet designed`. Events route transforms through normal card grading and bypass that caution.
+
+Enchants (Slither = randomise a card's cost 0–3) are further out still: there is no offered card at all, only a modification to one already in the deck.
+
+**Options:** (1) detect transform/enchant wording and print the option unscored with a note, same as `card_select` does — honest and cheap; (2) score transforms as a delta against the average starter; (3) leave events unscored entirely. Deck Compass says nothing on this screen either, which is worth knowing but is not evidence that silence is correct — it is evidence that nobody has solved it.
+
+**Status:**
+
+- **3a patched + regression-tested** (2026-09-21). `stripDeckSizeModifiers` in `shunraiAdapter.js` reverses the deck-size modifiers when `deckCards.length === 0`, refunding the exact penalty and recomputing the grade letter. Vendored `logic.js` untouched, same post-processing pattern as `applyHighCostDupePenalty`. `test/unknownDeck.test.mjs` pins both directions — the artifact is gone on an empty deck, and a genuinely small (10-card) or large (30-card) deck still collects its penalty, so the modifier itself is not disarmed. Peck on an unknown deck went 0.70 D → 1.00 D.
+- **3b patched** (2026-09-21). `reportEvent` now counts options that were meant to be scored but couldn't be (`!grade && !skipped`). With any such option the Pick line reads `Pick of the N scoreable (M not evaluated)`; when only one option is scoreable it prints `only 1 of N options is scoreable — no recommendation` instead of a Pick. **Verified by inspection, not by test** — `reportEvent` prints to the console and `live.js` starts the watcher at import, so it is not callable from a test without a refactor. Worth extracting the option-partitioning into a pure helper if this area is touched again.
+- **3c still open** — needs a decision on how transforms and enchants should be valued at all.
