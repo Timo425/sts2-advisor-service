@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const cacheDir = join(here, '..', '..', '.cache');
+// DECK_CACHE_DIR lets tests point at a throwaway directory. Without it a test run
+// that ends in clear() deletes the live snapshot from an actual run.
+const cacheDir = process.env.DECK_CACHE_DIR ?? join(here, '..', '..', '.cache');
 const cacheFile = join(cacheDir, 'last-deck.json');
 
 let snapshot = null;

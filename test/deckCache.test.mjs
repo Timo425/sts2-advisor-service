@@ -7,8 +7,20 @@
 // really was deck-blind. These tests pin the guards added in response.
 //
 // Run: npm run test:deckcache
+//
+// The cache dir is redirected to a temp directory *before* deckCache.js is imported —
+// it resolves its path at module load and eagerly reads the file. Without this the
+// clear() calls below delete the snapshot belonging to a real run.
 
-import { updateFromCombat, getSnapshot, getSnapshotFor, clear } from '../src/lib/deckCache.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const tmp = mkdtempSync(join(tmpdir(), 'deckcache-test-'));
+process.env.DECK_CACHE_DIR = tmp;
+process.on('exit', () => { try { rmSync(tmp, { recursive: true, force: true }); } catch {} });
+
+const { updateFromCombat, getSnapshot, getSnapshotFor, clear } = await import('../src/lib/deckCache.js');
 
 let pass = 0;
 let fail = 0;
