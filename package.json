@@ -8,7 +8,8 @@
     "coverage": "node src/cli/coverage.js",
     "grade": "node src/cli/grade.js",
     "probe": "node src/cli/probe.js",
-    "live": "node src/cli/live.js"
+    "live": "node src/cli/live.js",
+    "test:deckcache": "node test/deckCache.test.mjs"
   },
   "engines": {
     "node": ">=18"

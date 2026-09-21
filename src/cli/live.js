@@ -11,7 +11,7 @@ import {
   extractEquippedRelicIds,
   extractRemovalService,
 } from '../lib/stsmcpAdapter.js';
-import { updateFromCombat, getSnapshot } from '../lib/deckCache.js';
+import { updateFromCombat, getSnapshot, getSnapshotFor } from '../lib/deckCache.js';
 import { gradeCardOfferings, gradeRelicOfferings, gradeRemovalForDeck, analyzeDeckComposition, analyzeDeck as adapterAnalyzeDeck, findCardsInText, gradeUpgradePriorities } from '../advisor/shunraiAdapter.js';
 
 // Match Shunrai-style canonical ID format (uppercase, _-separated, no punctuation).
@@ -205,11 +205,28 @@ const ROLE_COLORS = {
   utility: dim,
 };
 
+// Every grading path goes through this, so a snapshot from an earlier run can never
+// silently become the deck we score against.
+function snapshotFor(state) {
+  return getSnapshotFor({
+    character: mapCharacter(state?.player?.character),
+    floor: state?.run?.floor,
+  });
+}
+
 function fmtDeckLine(cache, deckAnalysis, composition) {
   const lines = [];
   const parts = [];
-  if (cache) parts.push(`deck ${cache.deckCards.length} (cached @ floor ${cache.floor})`);
-  else parts.push(red('no deck snapshot yet'));
+  if (cache) {
+    parts.push(`deck ${cache.deckCards.length} (cached @ floor ${cache.floor}${cache.stable === false ? ', provisional' : ''})`);
+  } else {
+    // Say *why* there's no deck, otherwise a rejected cross-run cache looks the same
+    // as never having seen combat — and the grades below are deck-blind either way.
+    const raw = getSnapshot();
+    parts.push(raw
+      ? red(`no deck for this run — ignoring cached ${raw.deckCards.length} ${raw.character} cards from floor ${raw.floor}`)
+      : red('no deck snapshot yet'));
+  }
   if (deckAnalysis?.detected?.length) {
     const arches = deckAnalysis.detected.map(d => `${d.arch.name ?? d.arch.id}(${d.strength.toFixed(2)})`).join(' · ');
     parts.push(`archetypes: ${arches}`);
@@ -244,7 +261,7 @@ function reportCardReward(state) {
   const offered = extractOfferedCards(state);
   const equippedRelics = extractEquippedRelicIds(state);
   const canSkip = state?.card_reward?.can_skip ?? false;
-  const cache = getSnapshot();
+  const cache = snapshotFor(state);
   const deck = cache?.deckCards ?? [];
 
   const { deckAnalysis, grades } = gradeCardOfferings({
@@ -277,7 +294,7 @@ function reportShop(state) {
   const offeredRelics = extractOfferedRelics(state);
   const equippedRelics = extractEquippedRelicIds(state);
   const removal = extractRemovalService(state);
-  const cache = getSnapshot();
+  const cache = snapshotFor(state);
   const deck = cache?.deckCards ?? [];
 
   const composition = (cache && character) ? analyzeDeckComposition(character, deck) : null;
@@ -341,7 +358,7 @@ function reportCardSelect(state) {
   const cards = cs.cards ?? [];
   const character = mapCharacter(state?.player?.character);
   const floor = state?.run?.floor ?? 1;
-  const cache = getSnapshot();
+  const cache = snapshotFor(state);
   const deck = cache?.deckCards ?? [];
 
   console.log(fmtHeader(`CARD SELECT (${screenType})`, state));
@@ -469,7 +486,7 @@ function reportEvent(state) {
   const options = event.options ?? [];
   const character = mapCharacter(state?.player?.character);
   const floor = state?.run?.floor ?? 1;
-  const cache = getSnapshot();
+  const cache = snapshotFor(state);
   const deck = cache?.deckCards ?? [];
   const equippedRelics = extractEquippedRelicIds(state);
 
@@ -540,7 +557,7 @@ function reportRelicChoice(state) {
   const floor = state?.run?.floor ?? 1;
   const offeredRelics = extractOfferedRelics(state);
   const canSkip = state?.relic_select?.can_skip ?? state?.treasure?.can_skip ?? false;
-  const cache = getSnapshot();
+  const cache = snapshotFor(state);
   const deck = cache?.deckCards ?? [];
 
   const { grades } = gradeRelicOfferings({ character, deck, offered: offeredRelics });
@@ -603,7 +620,7 @@ async function tick() {
   const relicList = state?.player?.relics ?? [];
   const currentRelicIds = new Set(relicList.map(r => r.id).filter(Boolean));
   const character = mapCharacter(state?.player?.character);
-  const cache = getSnapshot();
+  const cache = snapshotFor(state);
   const deck = cache?.deckCards ?? [];
 
   if (firstRelicCheck) {
@@ -639,16 +656,21 @@ async function tick() {
   }
   lastRelicIds = currentRelicIds;
 
-  // Combat snapshot — capture deck only on stable ticks (player play phase),
-  // otherwise we can sample mid-card-resolution and miss cards in transit.
-  if (hasCombatPiles(state) && state?.battle?.is_play_phase === true && state?.battle?.turn === 'player') {
+  // Combat snapshot. A player-play-phase tick is the clean sample — nothing is in transit.
+  // But a fight can resolve inside one poll interval and never present such a tick, and the
+  // cost of that is grading the next reward with no deck at all. So sample on any tick with
+  // readable piles, tagged provisional; deckCache refuses to let a provisional sample shrink
+  // or displace a stable one, and a later stable tick on the same floor upgrades it.
+  if (hasCombatPiles(state)) {
     const character = mapCharacter(state?.player?.character);
     const deckCards = extractDeckFromCombatState(state);
     if (deckCards && deckCards.length) {
-      updateFromCombat({ character, floor: floor ?? 0, deckCards });
-      if (lastDeckCachedAtFloor !== floor) {
-        console.log(`[${stamp()}] deck snapshot captured: ${deckCards.length} cards at floor ${floor}`);
-        lastDeckCachedAtFloor = floor;
+      const stable = state?.battle?.is_play_phase === true && state?.battle?.turn === 'player';
+      const stored = updateFromCombat({ character, floor: floor ?? 0, deckCards, stable });
+      if (stored && lastDeckCachedAtFloor !== floor) {
+        const kind = stable ? 'deck snapshot captured' : 'deck snapshot captured (provisional)';
+        console.log(`[${stamp()}] ${kind}: ${deckCards.length} cards at floor ${floor}`);
+        if (stable) lastDeckCachedAtFloor = floor;
       }
     }
   }

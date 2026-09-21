@@ -31,25 +31,39 @@ function persist() {
   }
 }
 
-export function updateFromCombat({ character, floor, deckCards }) {
-  if (!Array.isArray(deckCards) || deckCards.length === 0) return;
-  // Within the same floor (= same encounter), the deck can only grow (status cards added
-  // by enemies) or stay equal. A drop almost certainly means we sampled mid-card-resolution.
-  // Only accept updates whose count is >= the existing snapshot for the same floor.
-  if (snapshot && snapshot.character === character && snapshot.floor === floor
-      && deckCards.length < snapshot.deckCards.length) {
-    return;
+// `stable` marks a sample taken during the player's play phase, which cannot catch cards
+// mid-resolution. Samples taken at any other point in combat are accepted too — a short
+// fight may never give us a stable tick — but they never displace a stable one of equal size.
+export function updateFromCombat({ character, floor, deckCards, stable = true }) {
+  if (!Array.isArray(deckCards) || deckCards.length === 0) return null;
+  if (snapshot && snapshot.character === character && snapshot.floor === floor) {
+    // Within the same floor (= same encounter), the deck can only grow (status cards added
+    // by enemies) or stay equal. A drop almost certainly means we sampled mid-card-resolution.
+    if (deckCards.length < snapshot.deckCards.length) return null;
+    if (!stable && snapshot.stable && deckCards.length === snapshot.deckCards.length) return null;
   }
   snapshot = {
     character,
     floor,
     deckCards: deckCards.slice(),
     capturedAt: Date.now(),
+    stable,
   };
   persist();
+  return { count: deckCards.length, stable };
 }
 
 export function getSnapshot() {
+  return snapshot;
+}
+
+// Grading must never silently use a snapshot belonging to a different run. Two tells:
+// a different character, or a cached floor ahead of the live one (floors only increase
+// within a run, so a higher cached floor means the cache predates this run).
+export function getSnapshotFor({ character, floor }) {
+  if (!snapshot) return null;
+  if (character && snapshot.character && snapshot.character !== character) return null;
+  if (Number.isFinite(floor) && Number.isFinite(snapshot.floor) && snapshot.floor > floor) return null;
   return snapshot;
 }
 
