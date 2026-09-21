@@ -43,6 +43,19 @@ export const localCardAnnotations = {
     role: 'utility',
   },
 
+  // Silent — present in v0.107.1, absent from the Shunrai snapshot.
+
+  SCARE: {
+    id: 'Scare',
+    tier: 'B',
+    builds: ['any', 'sly'],
+    syn: ['weak', 'aoe', 'zero_cost', 'debuff'],
+    anti: [],
+    notes: '0-cost Skill: apply 1 Weak to ALL enemies. Free AoE mitigation, and the zero cost makes it a live card-count trigger for Sly. Compare Leg Sweep (B) — no Block here, but free and hits everything. Tier is an unplayed starting estimate; revise once it shows up in a run.',
+    mech: ['weak'],
+    role: 'support',
+  },
+
   // Necrobinder — added in v0.103+ post-Shunrai-snapshot.
 
   CALL_OF_THE_VOID: {
