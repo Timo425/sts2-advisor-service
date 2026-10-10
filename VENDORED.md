@@ -17,8 +17,9 @@ If/when this repo is published, the `src/vendor/LICENSE-shunrai` file must be re
 ## spire-codex (referenced, not copied)
 
 - Repo: https://github.com/ptrlrd/spire-codex
-- Local clone: `/media/timo/Storage/Repositories/spire-codex/`
-- Used path: `data-beta/latest/eng/{cards,relics,potions}.json`
+- License: **PolyForm Noncommercial 1.0.0**; the game data it extracts is © Mega Crit Games.
+- Local clone: set by `SPIRE_CODEX_DIR`, default `../spire-codex` next to this repo.
+- Used path: `data-beta/<version>/eng/{cards,relics,potions}.json`, version pinned in `src/data/codexLoader.js`.
 - At time of A.1 setup: `data-beta/latest -> v0.105.1`, commit `d3d266b6113f8d5c445f33f60eba3b662eccd2c3` (2026-05-09).
 
-We read directly from the local clone rather than vendoring — spire-codex updates frequently with each game patch, and the canonical-list role demands freshness. To pin a snapshot for reproducible tests, copy a specific version dir into `fixtures/`.
+We read directly from the local clone rather than vendoring — spire-codex updates frequently with each game patch, and the canonical-list role demands freshness. **Never commit its data**: it is noncommercial-licensed and Mega Crit's game content. To pin a snapshot for reproducible tests, copy a version dir into `fixtures/codex/`, which is gitignored and stays local.

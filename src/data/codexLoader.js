@@ -1,7 +1,11 @@
 import { readFileSync, readlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const CODEX_ROOT = '/media/timo/Storage/Repositories/spire-codex';
+// A local spire-codex clone. SPIRE_CODEX_DIR overrides; the default is a clone next
+// to this repo (`../spire-codex`).
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const CODEX_ROOT = resolve(process.env.SPIRE_CODEX_DIR ?? join(repoRoot, '..', 'spire-codex'));
 
 // Which spire-codex data version to grade against.
 //
