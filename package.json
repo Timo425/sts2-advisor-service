@@ -9,6 +9,7 @@
     "grade": "node src/cli/grade.js",
     "probe": "node src/cli/probe.js",
     "live": "node src/cli/live.js",
+    "compare": "node src/cli/compareMentor.js",
     "test:deckcache": "node test/deckCache.test.mjs",
     "test:unknowndeck": "node test/unknownDeck.test.mjs",
     "test": "npm run test:deckcache && npm run test:unknowndeck && npm run test:antitags",
